@@ -31,6 +31,7 @@ main { position: relative; }
 .station:focus { outline: none; }
 .station:focus-visible text { text-decoration: underline; }
 .train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
+.train.stopped { fill: #0072ce; stroke: #ffd400; }
 .train.stale { fill: #c9c9c9; stroke: #7a8a99; }
 .board-anchor { position: absolute; z-index: 2; }
 

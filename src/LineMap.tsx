@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { LineConfig, SchematicStation, VehicleDto } from "../shared/types";
 import { linePath, pointOnLine } from "./schematic";
+import { useStopped } from "./useStopped";
 
 const STALE_AFTER = 3 * 60;
 const HIDE_AFTER = 10 * 60;
@@ -31,6 +32,7 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
   const last = stations[stations.length - 1];
   const sel = stations.find((s) => s.id === selected);
   const scroller = useRef<HTMLDivElement>(null);
+  const stopped = useStopped(vehicles);
   const boardPos = sel && boardPosition(sel, width);
 
   // On narrow screens the map scrolls sideways: bring the selected station into view.
@@ -80,13 +82,17 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             return (
               <g
                 key={v.id}
-                className={`train${age > STALE_AFTER ? " stale" : ""}`}
+                className={`train${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
               >
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
                 {v.direction ? <path d="M14,0 L-10,-11 L-5,0 L-10,11 Z" /> : <circle r={6} />}
                 <title>
-                  {[v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train", v.trainType && `${v.cars} car ${v.trainType}`]
+                  {[
+                    v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train",
+                    v.trainType && `${v.cars} car ${v.trainType}`,
+                    stopped.has(v.id) && "stopped",
+                  ]
                     .filter(Boolean)
                     .join(", ")}
                 </title>
