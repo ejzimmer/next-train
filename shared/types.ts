@@ -10,7 +10,8 @@ export interface LineConfig {
   routeIdMatch: string;
   /** Stations whose departures show a platform number. */
   platformStations: string[];
-  stations: { id: string; name: string }[];
+  /** gtfsName is the GTFS stop name without " Station", when it differs from name. */
+  stations: { id: string; name: string; gtfsName?: string }[];
 }
 
 /** Generated from GTFS static by scripts/build-gtfs.ts (data/*.json). */

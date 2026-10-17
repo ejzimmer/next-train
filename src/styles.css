@@ -46,5 +46,6 @@ main { display: flex; gap: 16px; align-items: flex-start; }
 footer { margin-top: 24px; }
 @media (max-width: 640px) {
   main { flex-direction: column; }
+  .app:has(.panel) { padding-bottom: 52vh; }
   .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; border-radius: 12px 12px 0 0; max-height: 50vh; overflow: auto; }
 }

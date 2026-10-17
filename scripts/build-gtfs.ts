@@ -47,9 +47,12 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
   const stationOfStop = new Map<string, string>();
 
   for (const station of line.stations) {
-    const named = stops.filter((s) => stationName(s.stop_name) === station.name.toLowerCase());
+    const named = stops.filter((s) => stationName(s.stop_name) === (station.gtfsName ?? station.name).toLowerCase());
     const parent = named.find((s) => s.location_type === "1");
-    const members = parent ? stops.filter((s) => s.parent_station === parent.stop_id) : named;
+    // Platforms only: skip entrances (location_type 2) and rail replacement bus stops.
+    const members = (parent ? stops.filter((s) => s.parent_station === parent.stop_id) : named).filter(
+      (s) => (s.location_type ?? "") in { "": 1, "0": 1 } && !/replacement/i.test(s.stop_name),
+    );
     if (!parent && members.length === 0) throw new Error(`No GTFS stop found for ${station.name}`);
     const anchor = parent ?? members[0];
     const platforms: Record<string, string> = {};
@@ -60,10 +63,9 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
     console.log(`${station.name}: ${stopIds.length} stop ids, platforms ${JSON.stringify(Object.values(platforms))}`);
   }
 
-  const routeCode = line.routeIdMatch.replace(/[^A-Za-z0-9]/g, "");
   const routeIds = new Set(
     csv(files, "routes.txt")
-      .filter((r) => r.route_id.includes(routeCode) || r.route_short_name === line.name)
+      .filter((r) => r.route_id.includes(line.routeIdMatch))
       .map((r) => r.route_id),
   );
   const tripIds = new Set(csv(files, "trips.txt").filter((t) => routeIds.has(t.route_id)).map((t) => t.trip_id));

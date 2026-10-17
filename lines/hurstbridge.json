@@ -31,7 +31,8 @@
     },
     {
       "id": "jolimont",
-      "name": "Jolimont"
+      "name": "Jolimont",
+      "gtfsName": "Jolimont-MCG"
     },
     {
       "id": "west-richmond",
