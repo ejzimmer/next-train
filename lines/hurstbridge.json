@@ -1,0 +1,125 @@
+{
+  "id": "hurstbridge",
+  "mode": "metro-train",
+  "name": "Hurstbridge",
+  "colour": "#BE1014",
+  "routeIdMatch": "-HBE:",
+  "platformStations": [
+    "flinders-street",
+    "southern-cross"
+  ],
+  "stations": [
+    {
+      "id": "flinders-street",
+      "name": "Flinders Street"
+    },
+    {
+      "id": "southern-cross",
+      "name": "Southern Cross"
+    },
+    {
+      "id": "flagstaff",
+      "name": "Flagstaff"
+    },
+    {
+      "id": "melbourne-central",
+      "name": "Melbourne Central"
+    },
+    {
+      "id": "parliament",
+      "name": "Parliament"
+    },
+    {
+      "id": "jolimont",
+      "name": "Jolimont"
+    },
+    {
+      "id": "west-richmond",
+      "name": "West Richmond"
+    },
+    {
+      "id": "north-richmond",
+      "name": "North Richmond"
+    },
+    {
+      "id": "collingwood",
+      "name": "Collingwood"
+    },
+    {
+      "id": "victoria-park",
+      "name": "Victoria Park"
+    },
+    {
+      "id": "clifton-hill",
+      "name": "Clifton Hill"
+    },
+    {
+      "id": "westgarth",
+      "name": "Westgarth"
+    },
+    {
+      "id": "dennis",
+      "name": "Dennis"
+    },
+    {
+      "id": "fairfield",
+      "name": "Fairfield"
+    },
+    {
+      "id": "alphington",
+      "name": "Alphington"
+    },
+    {
+      "id": "darebin",
+      "name": "Darebin"
+    },
+    {
+      "id": "ivanhoe",
+      "name": "Ivanhoe"
+    },
+    {
+      "id": "eaglemont",
+      "name": "Eaglemont"
+    },
+    {
+      "id": "heidelberg",
+      "name": "Heidelberg"
+    },
+    {
+      "id": "rosanna",
+      "name": "Rosanna"
+    },
+    {
+      "id": "macleod",
+      "name": "Macleod"
+    },
+    {
+      "id": "watsonia",
+      "name": "Watsonia"
+    },
+    {
+      "id": "greensborough",
+      "name": "Greensborough"
+    },
+    {
+      "id": "montmorency",
+      "name": "Montmorency"
+    },
+    {
+      "id": "eltham",
+      "name": "Eltham"
+    },
+    {
+      "id": "diamond-creek",
+      "name": "Diamond Creek"
+    },
+    {
+      "id": "wattle-glen",
+      "name": "Wattle Glen"
+    },
+    {
+      "id": "hurstbridge",
+      "name": "Hurstbridge"
+    }
+  ]
+}

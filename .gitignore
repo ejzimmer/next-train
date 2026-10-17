@@ -1,2 +1,5 @@
 node_modules
-function.zip
+dist
+.netlify
+.env
+gtfs-cache
