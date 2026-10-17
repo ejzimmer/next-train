@@ -4,6 +4,7 @@ import { decodeFeed } from "../shared/feed";
 import { buildDepartures } from "../shared/departures";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
+import { trainType } from "../shared/trainType";
 import type { LineConfig, LineData } from "../shared/types";
 
 // Snapshots of the live Metro feeds saved on 2026-10-17 around 22:00 Melbourne time.
@@ -81,5 +82,21 @@ describe("buildDepartures", () => {
     const all = Object.values(res.stations).flat();
     expect(all.every((d) => d.time > 0)).toBe(true);
     expect(res.stations.c.map((d) => d.time)).toEqual([...res.stations.c.map((d) => d.time)].sort((x, y) => x - y));
+  });
+});
+
+describe("trainType", () => {
+  it("recognises each fleet from its car numbers", () => {
+    expect(trainType("1403T-1686T-205M-206M-971M-972M")).toEqual({ type: "X'Trapolis 100", cars: 6 });
+    expect(trainType("2504T-2509T-707M-708M-717M-718M")).toEqual({ type: "Siemens Nexas", cars: 6 });
+    expect(trainType("1010T-1089T-343M-384M-477M-478M")).toEqual({ type: "Comeng", cars: 6 });
+    expect(trainType("9046M-9946M")).toEqual({ type: "HCMT", cars: 7 });
+    expect(trainType("1349T-97M-98M")).toEqual({ type: "X'Trapolis 100", cars: 3 });
+    expect(trainType("X99")).toEqual({ type: null, cars: 0 });
+  });
+
+  it("recognises every train in the saved feed", () => {
+    const unknown = vehiclesFeed.entity.map((e) => e.vehicle?.vehicle?.id ?? "").filter((id) => !trainType(id).type);
+    expect(unknown).toEqual([]);
   });
 });

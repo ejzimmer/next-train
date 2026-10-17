@@ -48,6 +48,9 @@ export interface VehicleDto {
   /** Index of the station segment start (0 = city end) and fraction towards the next station. */
   segment: number;
   fraction: number;
+  /** Inferred from the car numbers in the vehicle id; null when unrecognised. */
+  trainType: string | null;
+  cars: number;
 }
 
 export interface DepartureDto {

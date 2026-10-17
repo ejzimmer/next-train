@@ -4,9 +4,9 @@ import { linePath, pointOnLine } from "./schematic";
 
 const STALE_AFTER = 3 * 60;
 const HIDE_AFTER = 10 * 60;
-const BOARD_WIDTH = 340;
+const BOARD_WIDTH = 380;
 /** Room below the drawing for a board opened on a low station. */
-const BOARD_ROOM = 150;
+const BOARD_ROOM = 220;
 
 interface Props {
   line: LineConfig;
@@ -84,8 +84,12 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
               >
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
-                {v.direction ? <path d="M9,0 L-7,-8 L-3,0 L-7,8 Z" /> : <circle r={6} />}
-                <title>{v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train"}</title>
+                {v.direction ? <path d="M14,0 L-10,-11 L-5,0 L-10,11 Z" /> : <circle r={6} />}
+                <title>
+                  {[v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train", v.trainType && `${v.cars} car ${v.trainType}`]
+                    .filter(Boolean)
+                    .join(", ")}
+                </title>
               </g>
             );
           })}

@@ -1,5 +1,6 @@
 import { toNum, type FeedMessage } from "./feed";
 import { directionFromBearing, placeOnLine, segmentBearing } from "./position";
+import { trainType } from "./trainType";
 import type { LineConfig, LineData, VehicleDto, VehiclesResponse } from "./types";
 
 /** Trains further than this from the line (in metres) are left off the map. */
@@ -19,13 +20,17 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
       (v.position.bearing != null
         ? directionFromBearing(v.position.bearing, segmentBearing(segment, line, data))
         : null);
+    const id = v.vehicle?.id || entity.id;
+    const { type, cars } = trainType(id);
     vehicles.push({
-      id: v.vehicle?.id || entity.id,
+      id,
       tripId,
       timestamp: toNum(v.timestamp),
       direction,
       segment,
       fraction: placed.fraction,
+      trainType: type,
+      cars,
     });
   }
   return { feedTimestamp: toNum(feed.header.timestamp), vehicles };

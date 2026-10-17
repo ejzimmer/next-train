@@ -3,7 +3,6 @@
   --fg: #1a1a1a;
   --muted: #666666;
   --panel: #f4f4f4;
-  --train: #1a1a1a;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -14,7 +13,6 @@
     --fg: #f0f0f0;
     --muted: #a0a0a0;
     --panel: #1f1f1f;
-    --train: #f0f0f0;
   }
 }
 body { margin: 0; background: var(--bg); }
@@ -32,32 +30,29 @@ main { position: relative; }
 .station.selected text { font-weight: 700; }
 .station:focus { outline: none; }
 .station:focus-visible text { text-decoration: underline; }
-.train { fill: var(--train); stroke: var(--bg); stroke-width: 2; transition: transform 2s ease-in-out; }
-.train.stale { fill: var(--muted); }
+.train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
+.train.stale { fill: #c9c9c9; stroke: #7a8a99; }
 .board-anchor { position: absolute; z-index: 2; }
 
-/* Passenger information display: amber LED on black. */
+/* The "following trains" list from a Metro platform display. */
 .pid {
-  --amber: #ffa31a;
-  position: relative; padding: 10px 12px 8px;
-  background: #0b0b0b; color: var(--amber); border: 3px solid #2a2a2a; border-radius: 4px;
-  font-family: "Courier New", ui-monospace, monospace; font-weight: 700; text-transform: uppercase;
-  text-shadow: 0 0 4px rgba(255, 163, 26, 0.55); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  position: relative; padding: 6px 12px 8px; background: #fff; color: #111;
+  border-top: 8px solid; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-.pid-row { display: flex; gap: 10px; align-items: baseline; }
-.pid-time { min-width: 3.2em; }
-.pid-dest { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pid-mins { white-space: nowrap; }
-.pid-next { padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px dashed rgba(255, 163, 26, 0.35); }
-.pid-next .pid-dest { font-size: 1.15rem; }
-.pid-next .pid-mins { font-size: 1.15rem; }
-.pid-sub { justify-content: space-between; font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
-.pid-later { font-size: 0.85rem; padding: 2px 0; }
-.pid-plat { opacity: 0.85; }
-.pid-later.cancelled { text-decoration: line-through; opacity: 0.6; }
-.pid-empty { margin: 4px 0; font-size: 0.85rem; }
+.pid-row {
+  display: flex; align-items: center; gap: 12px; padding: 6px 0 6px 10px;
+  border-left: 4px solid; border-bottom: 1px solid #222;
+}
+.pid-row:last-child { border-bottom: none; }
+.pid-time { min-width: 4.6em; font-size: 0.95rem; }
+.pid-dest { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pid-detail { color: #555; font-size: 0.85rem; white-space: nowrap; }
+.pid-mins { background: #000; color: #fff; padding: 2px 8px; min-width: 4em; text-align: center; white-space: nowrap; }
+.pid-row.cancelled .pid-time, .pid-row.cancelled .pid-dest { text-decoration: line-through; color: #888; }
+.pid-empty { margin: 6px 0; font-size: 0.9rem; }
 .pid-close {
-  position: absolute; top: -12px; right: -12px; width: 26px; height: 26px; border-radius: 50%;
-  border: none; background: #2a2a2a; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+  position: absolute; top: -16px; right: -12px; width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: #222; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
 }
 footer { margin-top: 24px; }
