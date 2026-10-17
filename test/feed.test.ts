@@ -18,10 +18,11 @@ const line: LineConfig = {
   colour: "#BE1014",
   routeIdMatch: "-HBE:",
   platformStations: ["a"],
+  schematic: { width: 300, height: 100 },
   stations: [
-    { id: "a", name: "A" },
-    { id: "b", name: "B" },
-    { id: "c", name: "C" },
+    { id: "a", name: "A", x: 0, y: 50, label: "b" },
+    { id: "b", name: "B", x: 100, y: 50, label: "b" },
+    { id: "c", name: "C", x: 200, y: 50, label: "b" },
   ],
 };
 const data: LineData = {

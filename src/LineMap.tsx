@@ -1,11 +1,12 @@
-import type { LineConfig, VehicleDto } from "../shared/types";
+import { useEffect, useRef, type ReactNode } from "react";
+import type { LineConfig, SchematicStation, VehicleDto } from "../shared/types";
+import { linePath, pointOnLine } from "./schematic";
 
-export const ROW = 34;
-const TOP = 24;
-const LINE_X = 48;
-const DOT_OFFSET = 11;
 const STALE_AFTER = 3 * 60;
 const HIDE_AFTER = 10 * 60;
+const BOARD_WIDTH = 340;
+/** Room below the drawing for a board opened on a low station. */
+const BOARD_ROOM = 150;
 
 interface Props {
   line: LineConfig;
@@ -13,46 +14,96 @@ interface Props {
   now: number;
   selected: string | null;
   onSelect: (stationId: string) => void;
+  /** Shown beside the selected station's name. */
+  board: ReactNode;
 }
 
-export function LineMap({ line, vehicles, now, selected, onSelect }: Props) {
-  const height = TOP * 2 + ROW * (line.stations.length - 1);
+const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor: "start" | "middle" | "end" }> = {
+  t: { dx: 0, dy: -14, anchor: "middle" },
+  b: { dx: 0, dy: 24, anchor: "middle" },
+  l: { dx: -14, dy: 5, anchor: "end" },
+  r: { dx: 14, dy: 5, anchor: "start" },
+};
+
+export function LineMap({ line, vehicles, now, selected, onSelect, board }: Props) {
+  const { width, height } = line.schematic;
+  const stations = line.stations;
+  const last = stations[stations.length - 1];
+  const sel = stations.find((s) => s.id === selected);
+  const scroller = useRef<HTMLDivElement>(null);
+  const boardPos = sel && boardPosition(sel, width);
+
+  // On narrow screens the map scrolls sideways: bring the selected station into view.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !sel) return;
+    const { left } = boardPosition(sel, width);
+    const from = Math.min(sel.x, left) - 16;
+    const to = Math.max(sel.x, left + BOARD_WIDTH) + 16;
+    if (from < el.scrollLeft || to > el.scrollLeft + el.clientWidth) el.scrollTo({ left: from, behavior: "smooth" });
+  }, [sel, width]);
+
   return (
-    <svg className="line-map" viewBox={`0 0 320 ${height}`} role="img" aria-label={`${line.name} line map`}>
-      <line x1={LINE_X} x2={LINE_X} y1={TOP} y2={height - TOP} stroke={line.colour} strokeWidth={8} strokeLinecap="round" />
-      {line.stations.map((s, i) => (
-        <g
-          key={s.id}
-          className={`station${selected === s.id ? " selected" : ""}`}
-          transform={`translate(0 ${TOP + i * ROW})`}
-          onClick={() => onSelect(s.id)}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
-        >
-          <rect x={0} y={-ROW / 2} width={320} height={ROW} fill="transparent" />
-          <circle cx={LINE_X} cy={0} r={7} fill="var(--bg)" stroke={line.colour} strokeWidth={3} />
-          <text x={LINE_X + 32} y={5}>
-            {s.name}
-          </text>
-        </g>
-      ))}
-      {vehicles.map((v) => {
-        const age = now - v.timestamp;
-        if (age > HIDE_AFTER) return null;
-        const x = LINE_X + (v.direction === "outbound" ? DOT_OFFSET : v.direction === "citybound" ? -DOT_OFFSET : 0);
-        const y = TOP + (v.segment + v.fraction) * ROW;
-        return (
-          <circle
-            key={v.id}
-            className={`train${age > STALE_AFTER ? " stale" : ""}`}
-            r={6}
-            style={{ transform: `translate(${x}px, ${y}px)` }}
-          >
-            <title>{v.direction === "outbound" ? "To Hurstbridge" : v.direction === "citybound" ? "To the city" : "Train"}</title>
-          </circle>
-        );
-      })}
-    </svg>
+    <div className="map-scroll" ref={scroller}>
+      <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
+        <svg width={width} height={height} role="img" aria-label={`${line.name} line map`}>
+          {line.schematic.loopClosure && (
+            <polyline points={line.schematic.loopClosure.join(" ")} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" />
+          )}
+          <path d={linePath(stations)} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" strokeLinecap="round" />
+          <line x1={last.x} x2={last.x} y1={last.y - 10} y2={last.y + 10} stroke={line.colour} strokeWidth={6} />
+          {stations.map((s) => {
+            const l = LABEL[s.label];
+            return (
+              <g
+                key={s.id}
+                className={`station${selected === s.id ? " selected" : ""}`}
+                onClick={() => onSelect(s.id)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={s.name}
+              >
+                <circle cx={s.x} cy={s.y} r={14} fill="transparent" />
+                <circle cx={s.x} cy={s.y} r={6} fill="var(--bg)" stroke={line.colour} strokeWidth={3} />
+                <text x={s.x + l.dx} y={s.y + l.dy} textAnchor={l.anchor}>
+                  {s.name}
+                </text>
+              </g>
+            );
+          })}
+          {vehicles.map((v) => {
+            const age = now - v.timestamp;
+            if (age > HIDE_AFTER || v.segment >= stations.length - 1) return null;
+            const p = pointOnLine(stations, v.segment, v.fraction);
+            const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
+            return (
+              <g
+                key={v.id}
+                className={`train${age > STALE_AFTER ? " stale" : ""}`}
+                style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
+              >
+                {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
+                {v.direction ? <path d="M9,0 L-7,-8 L-3,0 L-7,8 Z" /> : <circle r={6} />}
+                <title>{v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train"}</title>
+              </g>
+            );
+          })}
+        </svg>
+        {boardPos && (
+          <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
+            {board}
+          </div>
+        )}
+      </div>
+    </div>
   );
+}
+
+/** Beside the label when it reads to the right and there's room; otherwise just below the station. */
+function boardPosition(s: SchematicStation, width: number) {
+  const besideLabel = s.x + 24 + s.name.length * 7.5;
+  if (s.label === "r" && besideLabel + BOARD_WIDTH <= width) return { left: besideLabel, top: s.y - 22 };
+  const below = s.label === "t" || s.label === "b" ? 40 : 20;
+  return { left: Math.max(0, Math.min(width - BOARD_WIDTH, s.x - 60)), top: s.y + below };
 }

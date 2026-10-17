@@ -18,34 +18,46 @@
   }
 }
 body { margin: 0; background: var(--bg); }
-.app { max-width: 760px; margin: 0 auto; padding: 16px; }
+.app { max-width: 1100px; margin: 0 auto; padding: 16px; }
 .top h1 { margin: 0; font-size: 1.4rem; }
 .top p { margin: 4px 0 12px; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .warning { background: #fff3cd; color: #5c4400; padding: 8px 12px; border-radius: 6px; }
-main { display: flex; gap: 16px; align-items: flex-start; }
-.line-map { width: 100%; max-width: 360px; flex: 1 1 auto; }
+main { position: relative; }
+.map-scroll { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.line-map { position: relative; }
+.line-map svg { display: block; overflow: visible; }
 .station { cursor: pointer; }
-.station text { fill: var(--fg); font-size: 14px; }
+.station text { fill: var(--fg); font-size: 13px; }
 .station.selected text { font-weight: 700; }
 .station:focus { outline: none; }
 .station:focus-visible text { text-decoration: underline; }
 .train { fill: var(--train); stroke: var(--bg); stroke-width: 2; transition: transform 2s ease-in-out; }
 .train.stale { fill: var(--muted); }
-.panel { background: var(--panel); border-radius: 8px; padding: 12px 16px; flex: 0 0 260px; position: sticky; top: 16px; }
-.panel header { display: flex; justify-content: space-between; align-items: center; }
-.panel h2 { margin: 0; font-size: 1.1rem; }
-.panel h3 { margin: 12px 0 4px; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
-.panel button { background: none; border: none; font-size: 1.4rem; color: var(--fg); cursor: pointer; }
-.panel ul { list-style: none; margin: 0; padding: 0; }
-.panel li { display: flex; gap: 8px; padding: 4px 0; }
-.panel .when { font-weight: 700; min-width: 4em; }
-.panel .dest { flex: 1; }
-.panel .platform { color: var(--muted); }
-.panel .cancelled { text-decoration: line-through; color: var(--muted); }
-footer { margin-top: 24px; }
-@media (max-width: 640px) {
-  main { flex-direction: column; }
-  .app:has(.panel) { padding-bottom: 52vh; }
-  .panel { position: fixed; left: 0; right: 0; bottom: 0; top: auto; border-radius: 12px 12px 0 0; max-height: 50vh; overflow: auto; }
+.board-anchor { position: absolute; z-index: 2; }
+
+/* Passenger information display: amber LED on black. */
+.pid {
+  --amber: #ffa31a;
+  position: relative; padding: 10px 12px 8px;
+  background: #0b0b0b; color: var(--amber); border: 3px solid #2a2a2a; border-radius: 4px;
+  font-family: "Courier New", ui-monospace, monospace; font-weight: 700; text-transform: uppercase;
+  text-shadow: 0 0 4px rgba(255, 163, 26, 0.55); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
+.pid-row { display: flex; gap: 10px; align-items: baseline; }
+.pid-time { min-width: 3.2em; }
+.pid-dest { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pid-mins { white-space: nowrap; }
+.pid-next { padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px dashed rgba(255, 163, 26, 0.35); }
+.pid-next .pid-dest { font-size: 1.15rem; }
+.pid-next .pid-mins { font-size: 1.15rem; }
+.pid-sub { justify-content: space-between; font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+.pid-later { font-size: 0.85rem; padding: 2px 0; }
+.pid-plat { opacity: 0.85; }
+.pid-later.cancelled { text-decoration: line-through; opacity: 0.6; }
+.pid-empty { margin: 4px 0; font-size: 0.85rem; }
+.pid-close {
+  position: absolute; top: -12px; right: -12px; width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: #2a2a2a; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+}
+footer { margin-top: 24px; }

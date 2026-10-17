@@ -1,5 +1,18 @@
 export type Direction = "citybound" | "outbound";
 
+export interface SchematicStation {
+  id: string;
+  name: string;
+  /** GTFS stop name without " Station", when it differs from name. */
+  gtfsName?: string;
+  /** Position on the schematic, and which side the label sits. */
+  x: number;
+  y: number;
+  label: "t" | "b" | "l" | "r";
+  /** Bends in the line between the previous station and this one. */
+  via?: [number, number][];
+}
+
 /** Hand-written line config (lines/*.json). Stations are listed city end first. */
 export interface LineConfig {
   id: string;
@@ -10,8 +23,9 @@ export interface LineConfig {
   routeIdMatch: string;
   /** Stations whose departures show a platform number. */
   platformStations: string[];
-  /** gtfsName is the GTFS stop name without " Station", when it differs from name. */
-  stations: { id: string; name: string; gtfsName?: string }[];
+  /** Size of the schematic drawing in px, and any extra track drawn but not used for placing trains. */
+  schematic: { width: number; height: number; loopClosure?: [number, number][] };
+  stations: SchematicStation[];
 }
 
 /** Generated from GTFS static by scripts/build-gtfs.ts (data/*.json). */

@@ -3,7 +3,7 @@ import hurstbridge from "../lines/hurstbridge.json";
 import stationData from "../data/hurstbridge.stations.json";
 import type { DeparturesResponse, LineConfig, VehiclesResponse } from "../shared/types";
 import { LineMap } from "./LineMap";
-import { StationPanel } from "./StationPanel";
+import { StationBoard } from "./StationBoard";
 import { useNow, usePoll } from "./usePoll";
 
 const line = hurstbridge as LineConfig;
@@ -54,16 +54,23 @@ export function App() {
       </header>
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
-        <LineMap line={line} vehicles={vehicles.data?.vehicles ?? []} now={now} selected={selected} onSelect={select} />
-        {selected && (
-          <StationPanel
-            line={line}
-            stationId={selected}
-            departures={departures.data?.stations[selected]}
-            now={now}
-            onClose={() => select(null)}
-          />
-        )}
+        <LineMap
+          line={line}
+          vehicles={vehicles.data?.vehicles ?? []}
+          now={now}
+          selected={selected}
+          onSelect={select}
+          board={
+            selected && (
+              <StationBoard
+                line={line}
+                departures={departures.data?.stations[selected]}
+                now={now}
+                onClose={() => select(null)}
+              />
+            )
+          }
+        />
       </main>
       <footer className="muted">
         Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence.
