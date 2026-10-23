@@ -6,9 +6,6 @@ interface Props {
   now: number;
 }
 
-/** Effects that are about station facilities (car parks, lifts) rather than trains running. */
-const NOTICE_EFFECTS = new Set(["OTHER_EFFECT", "UNKNOWN_EFFECT", "NO_EFFECT", "ACCESSIBILITY_ISSUE"]);
-
 const dateTime = new Intl.DateTimeFormat("en-AU", {
   weekday: "short",
   day: "numeric",
@@ -26,16 +23,15 @@ function period(a: AlertDto, now: number) {
 }
 
 function Alert({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: number }) {
-  const names = alert.stations
-    .map((id) => line.stations.find((s) => s.id === id)?.name)
-    .filter(Boolean)
-    .join(", ");
+  const name = (id: string) => line.stations.find((s) => s.id === id)?.name ?? id;
+  const title = alert.buses
+    ? `Buses replace trains ${name(alert.buses.from)} to ${name(alert.buses.to)}`
+    : alert.header.replace(/^planned work:\s*/i, "");
   return (
     <details className="alert">
       <summary>
-        <strong>{alert.header}</strong> <span className="alert-when">{period(alert, now)}</span>
+        <strong>{title}</strong> <span className="alert-when">{period(alert, now)}</span>
       </summary>
-      {names && <p className="alert-stations">{names}</p>}
       <p>{alert.description}</p>
       {alert.url && (
         <p>
@@ -48,27 +44,17 @@ function Alert({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: n
   );
 }
 
-/** Service changes up front; car park and lift notices folded away underneath. */
+/** Train disruptions for the line, current ones highlighted; tap one for Metro's full notice. */
 export function Disruptions({ line, alerts, now }: Props) {
   if (!alerts?.length) return null;
-  const service = alerts.filter((a) => !NOTICE_EFFECTS.has(a.effect));
-  const notices = alerts.filter((a) => NOTICE_EFFECTS.has(a.effect));
   const live = (a: AlertDto) => !a.start || a.start <= now;
   return (
     <section className="disruptions" aria-label="Disruptions">
-      {service.map((a) => (
+      {alerts.map((a) => (
         <div key={a.id} className={`disruption${live(a) ? " live" : ""}`}>
           <Alert line={line} alert={a} now={now} />
         </div>
       ))}
-      {notices.length > 0 && (
-        <details className="notices">
-          <summary className="muted">Station notices ({notices.length})</summary>
-          {notices.map((a) => (
-            <Alert key={a.id} line={line} alert={a} now={now} />
-          ))}
-        </details>
-      )}
     </section>
   );
 }

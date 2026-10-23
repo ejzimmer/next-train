@@ -64,9 +64,8 @@ footer { margin-top: 24px; }
 .disruption.live a { color: #5c4400; }
 .alert summary { cursor: pointer; }
 .alert p { margin: 6px 0; font-size: 0.9rem; line-height: 1.4; }
-.alert-when, .alert-stations { color: inherit; opacity: 0.75; font-size: 0.85rem; }
-.notices > summary { cursor: pointer; }
-.notices .alert { margin: 6px 0 0 16px; font-size: 0.9rem; }
+.alert-when { color: inherit; opacity: 0.75; font-size: 0.85rem; }
+.bus-stretch { stroke: #ffffff; stroke-width: 3; stroke-dasharray: 6 6; fill: none; }
 .train.shared { fill: #ffffff; }
 .train.shared.stopped { fill: #0072ce; stroke: #ffffff; }
 .train.shared.stale { fill: #c9c9c9; stroke: #7a8a99; }

@@ -62,6 +62,9 @@ export function App() {
         <LineMap
           line={line}
           vehicles={vehicles.data?.vehicles ?? []}
+          busStretches={(alerts.data?.alerts ?? [])
+            .filter((a) => a.buses && (!a.start || a.start <= now))
+            .map((a) => a.buses!)}
           now={now}
           selected={selected}
           onSelect={select}

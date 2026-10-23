@@ -142,12 +142,14 @@ describe("buildAlerts", () => {
   const now = Number(alertsFeed.header.timestamp);
   const { alerts } = buildAlerts(alertsFeed, hurstbridge.config, hurstbridge.data, now);
 
-  it("keeps the line's alerts once each, with the stations they name", () => {
-    const headers = alerts.map((a) => a.header);
-    expect(new Set(headers.map((h, i) => h + alerts[i].description)).size).toBe(alerts.length);
-    const buses = alerts.find((a) => a.header.includes("Buses replace trains between Heidelberg"))!;
-    expect(buses.effect).toBe("MODIFIED_SERVICE");
-    expect(buses.stations).toEqual(expect.arrayContaining(["heidelberg", "greensborough"]));
+  it("keeps train disruptions only, merging the two alerts Metro posts for the same works", () => {
+    expect(alerts.map((a) => a.effect)).not.toContain("OTHER_EFFECT");
+    const buses = alerts.filter((a) => a.buses);
+    expect(buses).toHaveLength(1);
+    expect(buses[0].buses).toEqual({ from: "heidelberg", to: "greensborough" });
+    // The "Planned work: ..." alert's start (8:30pm), not the generic one's earlier go-live time.
+    expect(buses[0].start).toBe(Date.UTC(2026, 9, 23, 9, 30) / 1000);
+    expect(buses[0].description).toContain("Replacement buses are subject to local traffic");
     // Other lines' works aren't included.
     expect(alerts.some((a) => a.description.includes("Sunbury line services"))).toBe(false);
   });

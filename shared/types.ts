@@ -92,6 +92,8 @@ export interface AlertDto {
   end: number | null;
   /** Station ids named in the alert, when it's about particular stations. */
   stations: string[];
+  /** For "Buses replace trains between X and Y" works: the two station ids, city end first. */
+  buses: { from: string; to: string } | null;
 }
 
 export interface AlertsResponse {
