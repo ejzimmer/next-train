@@ -1,0 +1,59 @@
+:root {
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #666666;
+  --panel: #f4f4f4;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--fg);
+  background: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --fg: #f0f0f0;
+    --muted: #a0a0a0;
+    --panel: #1f1f1f;
+  }
+}
+body { margin: 0; background: var(--bg); }
+.app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+.top h1 { margin: 0; font-size: 1.4rem; }
+.top p { margin: 4px 0 12px; }
+.muted { color: var(--muted); font-size: 0.85rem; }
+.warning { background: #fff3cd; color: #5c4400; padding: 8px 12px; border-radius: 6px; }
+main { position: relative; }
+.map-scroll { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.line-map { position: relative; }
+.line-map svg { display: block; overflow: visible; }
+.station { cursor: pointer; }
+.station text { fill: var(--fg); font-size: 13px; }
+.station.selected text { font-weight: 700; }
+.station:focus { outline: none; }
+.station:focus-visible text { text-decoration: underline; }
+.train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
+.train.stopped { fill: #0072ce; stroke: #ffd400; }
+.train.stale { fill: #c9c9c9; stroke: #7a8a99; }
+.board-anchor { position: absolute; z-index: 2; }
+
+/* The "following trains" list from a Metro platform display. */
+.pid {
+  position: relative; padding: 6px 12px 8px; background: #fff; color: #111;
+  border-top: 8px solid; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.pid-row {
+  display: flex; align-items: center; gap: 12px; padding: 6px 0 6px 10px;
+  border-left: 4px solid; border-bottom: 1px solid #222;
+}
+.pid-row:last-child { border-bottom: none; }
+.pid-time { min-width: 4.6em; font-size: 0.95rem; }
+.pid-dest { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pid-detail { color: #555; font-size: 0.85rem; white-space: nowrap; }
+.pid-mins { background: #000; color: #fff; padding: 2px 8px; min-width: 4em; text-align: center; white-space: nowrap; }
+.pid-row.cancelled .pid-time, .pid-row.cancelled .pid-dest { text-decoration: line-through; color: #888; }
+.pid-empty { margin: 6px 0; font-size: 0.9rem; }
+.pid-close {
+  position: absolute; top: -16px; right: -12px; width: 26px; height: 26px; border-radius: 50%;
+  border: none; background: #222; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
+}
+footer { margin-top: 24px; }

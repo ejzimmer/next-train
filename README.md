@@ -1,68 +1,34 @@
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+# next-train: Hurstbridge line live map
 
-## Available Scripts
+A schematic map of the Hurstbridge line showing where each train is right now, with next departures for any
+station you click. Data comes from Transport Victoria's GTFS Realtime feeds.
 
-In the project directory, you can run:
+## How it works
 
-### `npm start`
+- `netlify/functions/vehicles.ts` and `departures.ts` fetch the Metro GTFS-R feeds with the API key, decode
+  them and return small JSON for one line. Responses are cached on Netlify's CDN for 30 s, so the key never
+  reaches the browser and repeat loads don't spend the API's 24 calls / minute limit.
+- `lines/hurstbridge.json` is the hand-written line config: stations in order, city end first.
+- `data/hurstbridge.*.json` is generated from the GTFS Schedule zip: station coordinates, stop IDs, platform
+  numbers and each timetabled trip's direction and destination.
+- The browser polls both functions every 60 s (paused while the tab is hidden) and places each train between
+  stations by snapping its GPS position onto the line.
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+## Setup
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+1. Get a GTFS Realtime API key from the Transport Victoria Open Data Portal. It's a UUID-style KeyID.
+2. In Netlify, set the environment variable `PTV_OPENDATA_KEY` to that key. Use the Functions scope; it
+   doesn't need to be available to the build.
+3. Generate station data: `npm run gtfs` (downloads the GTFS Schedule zip), or
+   `npm run gtfs -- path/to/gtfs.zip`. Commit the files it writes in `data/`. Re-run when the timetable changes.
 
-### `npm test`
+## Development
 
-Launches the test runner in the interactive watch mode.<br />
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```
+npm install
+npm test          # unit tests against saved feed snapshots in test/fixtures
+npx netlify dev   # site + functions locally; needs PTV_OPENDATA_KEY in .env
+```
 
-### `npm run build`
-
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
-
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
-
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/code-splitting
-
-### Analyzing the Bundle Size
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size
-
-### Making a Progressive Web App
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app
-
-### Advanced Configuration
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/advanced-configuration
-
-### Deployment
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/deployment
-
-### `npm run build` fails to minify
-
-This section has moved here: https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify
+Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence.
+Not affiliated with PTV.
