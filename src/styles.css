@@ -76,6 +76,7 @@ footer { margin-top: 24px; }
 .notice { padding: 10px 0; border-bottom: 2px solid #4a90d9; }
 .notice:last-of-type { border-bottom: none; }
 .notice h2 { margin: 0; font-size: 1.5rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.01em; }
+.notice-after { font-size: 1.1rem; font-weight: 700; }
 .notice-sub { margin: 2px 0 8px; font-weight: 600; }
 .notice details { font-size: 0.85rem; margin-top: 6px; }
 .notice details summary { cursor: pointer; color: #555; }
@@ -102,3 +103,4 @@ footer { margin-top: 24px; }
 .legend li { display: flex; align-items: center; gap: 4px; }
 .legend svg { overflow: visible; }
 .legend .train { transition: none; }
+.notice h2 + .cal { margin-top: 6px; }

@@ -58,7 +58,13 @@ export function LineMap({ line, vehicles, closedStretches, now, selected, onSele
           {closedStretches.map(({ from, to }) => {
             const a = stations.findIndex((s) => s.id === from);
             const b = stations.findIndex((s) => s.id === to);
-            return a >= 0 && b > a && <path key={`${from}-${to}`} className="bus-stretch" d={linePath(stations.slice(a, b + 1))} />;
+            if (a < 0 || b <= a) return null;
+            let d = linePath(stations.slice(a, b + 1));
+            // A closed City Loop is dashed all the way to where the loop tracks rejoin the line.
+            const loop = line.cityLoop;
+            const junction = line.schematic.loopClosure?.at(-1);
+            if (loop && junction && from === loop[0] && to === loop[1]) d += ` L${junction[0]},${junction[1]}`;
+            return <path key={`${from}-${to}`} className="bus-stretch" d={d} />;
           })}
           <line x1={last.x} x2={last.x} y1={last.y - 10} y2={last.y + 10} stroke={line.colour} strokeWidth={6} />
           {stations.map((s) => {

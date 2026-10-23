@@ -21,7 +21,7 @@ const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 function headline(alert: AlertDto, name: (id: string) => string) {
   if (alert.kind === "buses" && alert.stretch)
     return { title: "Buses replace trains", sub: `between ${name(alert.stretch.from)} and ${name(alert.stretch.to)}` };
-  if (alert.kind === "loop") return { title: "No City Loop", sub: "trains run direct to and from Flinders Street" };
+  if (alert.kind === "loop") return { title: "No City Loop", sub: null };
   return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: null };
 }
 
@@ -59,15 +59,19 @@ function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: 
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
   const live = !alert.start || alert.start <= now;
-  // When the trains stop each night, from the earliest period (alert.start can be when the notice went up).
+  // When the trains stop each night, from the same periods the calendar uses.
   const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
+  const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
   return (
     <section className={`notice${live ? " live" : ""}`}>
-      <h2>{title}</h2>
-      {(sub || nightOnly) && (
+      <h2>
+        {title}
+        {!sub && after && <span className="notice-after"> {after}</span>}
+      </h2>
+      {sub && (
         <p className="notice-sub">
           {sub}
-          {nightOnly && Number.isFinite(firstStart) && ` after ${time(firstStart)}`}
+          {after && ` ${after}`}
         </p>
       )}
       <Calendar alert={alert} now={now} />
