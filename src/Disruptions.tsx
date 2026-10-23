@@ -59,13 +59,15 @@ function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: 
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
   const live = !alert.start || alert.start <= now;
+  // When the trains stop each night, from the earliest period (alert.start can be when the notice went up).
+  const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
   return (
     <section className={`notice${live ? " live" : ""}`}>
       <h2>{title}</h2>
       {(sub || nightOnly) && (
         <p className="notice-sub">
           {sub}
-          {nightOnly && alert.start && ` after ${time(alert.start)}`}
+          {nightOnly && Number.isFinite(firstStart) && ` after ${time(firstStart)}`}
         </p>
       )}
       <Calendar alert={alert} now={now} />
