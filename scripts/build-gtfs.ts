@@ -63,41 +63,47 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
     console.log(`${station.name}: ${stopIds.length} stop ids, platforms ${JSON.stringify(Object.values(platforms))}`);
   }
 
-  const routeIds = new Set(
-    csv(files, "routes.txt")
-      .filter((r) => r.route_id.includes(line.routeIdMatch))
-      .map((r) => r.route_id),
-  );
+  // Our own routes, plus lines that share part of our track (their trains show on the map there).
+  const matchers = [line.routeIdMatch, ...(line.shared ?? []).map((s) => s.routeIdMatch)];
+  const routes = csv(files, "routes.txt").filter((r) => matchers.some((m) => r.route_id.includes(m)));
+  const routeIds = new Set(routes.map((r) => r.route_id));
   const tripIds = new Set(csv(files, "trips.txt").filter((t) => routeIds.has(t.route_id)).map((t) => t.trip_id));
   console.log(`Routes ${[...routeIds].join(", ")}: ${tripIds.size} trips`);
 
   // stop_times.txt is large, so scan it line by line instead of parsing it all.
-  const ends = new Map<string, { first: [number, string]; last: [number, string] }>();
+  // For each trip: its last stop, and its first and last stops on our line.
+  type End = [seq: number, stop: string];
+  const ends = new Map<string, { last: End; firstOn?: End; lastOn?: End }>();
   const text = strFromU8(files["stop_times.txt"]);
-  const header = text.slice(0, text.indexOf("\n")).replace(/^﻿/, "").trim().split(",");
+  const header = text.slice(0, text.indexOf("\n")).replace(/^\uFEFF/, "").trim().split(",");
   const [ti, si, qi] = ["trip_id", "stop_id", "stop_sequence"].map((c) => header.indexOf(c));
   for (const row of text.split("\n")) {
     const cols = row.split(",");
     const tripId = cols[ti]?.replace(/"/g, "");
     if (!tripId || !tripIds.has(tripId)) continue;
-    const seq = Number(cols[qi]?.replace(/"/g, ""));
-    const stop = cols[si].replace(/"/g, "");
-    const e = ends.get(tripId);
-    if (!e) ends.set(tripId, { first: [seq, stop], last: [seq, stop] });
-    else {
-      if (seq < e.first[0]) e.first = [seq, stop];
-      if (seq > e.last[0]) e.last = [seq, stop];
+    const end: End = [Number(cols[qi]?.replace(/"/g, "")), cols[si].replace(/"/g, "")];
+    const e = ends.get(tripId) ?? { last: end };
+    ends.set(tripId, e);
+    if (end[0] > e.last[0]) e.last = end;
+    if (stationOfStop.has(end[1])) {
+      if (!e.firstOn || end[0] < e.firstOn[0]) e.firstOn = end;
+      if (!e.lastOn || end[0] > e.lastOn[0]) e.lastOn = end;
     }
   }
 
+  const stopName = new Map(stops.map((s) => [s.stop_id, s.stop_name]));
+  const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
   const index = (stop: string) => line.stations.findIndex((s) => s.id === stationOfStop.get(stop));
   const trips: LineData["trips"] = {};
-  for (const [tripId, { first, last }] of ends) {
-    const a = index(first[1]);
-    const b = index(last[1]);
-    if (a < 0 || b < 0 || a === b) continue;
+  for (const [tripId, { last, firstOn, lastOn }] of ends) {
+    if (!firstOn || !lastOn) continue;
+    const a = index(firstOn[1]);
+    const b = index(lastOn[1]);
+    if (a === b) continue;
     const dir: Direction = b > a ? "outbound" : "citybound";
-    trips[tripId] = { dir, dest: line.stations[b].id };
+    // Trains that leave our line terminate somewhere we don't draw: keep the terminus name.
+    const dest = stationOfStop.get(last[1]) ?? titleCase(stationName(stopName.get(last[1]) ?? ""));
+    trips[tripId] = { dir, dest };
   }
   console.log(`${Object.keys(trips).length} trips with direction`);
 

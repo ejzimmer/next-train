@@ -82,14 +82,15 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             return (
               <g
                 key={v.id}
-                className={`train${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                className={`train${v.route ? " shared" : ""}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
               >
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
-                {v.direction ? <path d="M14,0 L-10,-11 L-5,0 L-10,11 Z" /> : <circle r={6} />}
+                {v.direction ? <path d={ARROW} /> : <circle r={6} />}
                 <title>
                   {[
-                    v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train",
+                    `${v.route ?? line.name} train` +
+                      (v.direction === "outbound" ? ` to ${v.route ?? line.name}` : v.direction ? " to the city" : ""),
                     v.trainType && `${v.cars} car ${v.trainType}`,
                     stopped.has(v.id) && "stopped",
                   ]
@@ -100,6 +101,7 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             );
           })}
         </svg>
+        <Legend line={line} />
         {boardPos && (
           <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
             {board}
@@ -116,4 +118,27 @@ function boardPosition(s: SchematicStation, width: number) {
   if (s.label === "r" && besideLabel + BOARD_WIDTH <= width) return { left: besideLabel, top: s.y - 22 };
   const below = s.label === "t" || s.label === "b" ? 40 : 20;
   return { left: Math.max(0, Math.min(width - BOARD_WIDTH, s.x - 60)), top: s.y + below };
+}
+
+const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
+
+function Legend({ line }: { line: LineConfig }) {
+  const items: [string, string][] = [
+    ["train", `${line.name} train`],
+    ...(line.shared ?? []).map((s): [string, string] => ["train shared", `${s.name} train`]),
+    ["train stopped", "Stopped"],
+    ["train stale", "No recent update"],
+  ];
+  return (
+    <ul className="legend muted">
+      {items.map(([cls, label]) => (
+        <li key={label}>
+          <svg width={28} height={24} viewBox="-14 -12 28 24" aria-hidden>
+            <path className={cls} d={ARROW} />
+          </svg>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
 }

@@ -1,10 +1,10 @@
 import { lines } from "./lines";
 
-/** Cached on Netlify's CDN so repeat requests within a minute don't reach the Open Data API. */
+/** Cached on Netlify's CDN so repeat requests within a few seconds don't reach the Open Data API. */
 export const CACHE_HEADERS = {
   "Content-Type": "application/json",
   "Cache-Control": "public, max-age=0, must-revalidate",
-  "Netlify-CDN-Cache-Control": "public, durable, s-maxage=30, stale-while-revalidate=30",
+  "Netlify-CDN-Cache-Control": "public, durable, s-maxage=15, stale-while-revalidate=15",
 };
 
 export function lineFromRequest(req: Request) {

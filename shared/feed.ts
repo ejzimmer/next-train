@@ -5,7 +5,7 @@ export type FeedMessage = GtfsRealtimeBindings.transit_realtime.FeedMessage;
 
 const BASE = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1";
 
-export type FeedName = "vehicle-positions" | "trip-updates";
+export type FeedName = "vehicle-positions" | "trip-updates" | "service-alerts";
 
 export function decodeFeed(bytes: Uint8Array): FeedMessage {
   return transit_realtime.FeedMessage.decode(bytes);

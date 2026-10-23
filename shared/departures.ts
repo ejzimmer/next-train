@@ -1,5 +1,6 @@
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
+import { matchRoute } from "./routes";
 import type { DepartureDto, DeparturesResponse, Direction, LineConfig, LineData } from "./types";
 
 const { TripDescriptor, TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -12,7 +13,8 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
   for (const entity of feed.entity) {
     const tu = entity.tripUpdate;
     const tripId = tu?.trip?.tripId;
-    if (!tu || !tripId || !tu.trip.routeId?.includes(line.routeIdMatch)) continue;
+    const match = matchRoute(tu?.trip?.routeId, line);
+    if (!tu || !tripId || !match) continue;
     const cancelled = tu.trip.scheduleRelationship === TripDescriptor.ScheduleRelationship.CANCELED;
 
     const stops = (tu.stopTimeUpdate ?? [])
@@ -22,7 +24,14 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
     const direction: Direction | null =
       known?.dir ??
       (stops.length >= 2 ? (stops[stops.length - 1].index > stops[0].index ? "outbound" : "citybound") : null);
-    const destination = known?.dest ?? (stops.length >= 2 ? line.stations[stops[stops.length - 1].index].id : null);
+    // Without static data, a shared-line train heading out is going to its own line's terminus.
+    const destination =
+      known?.dest ??
+      (match.route && direction === "outbound"
+        ? match.route
+        : stops.length >= 2
+          ? line.stations[stops[stops.length - 1].index].id
+          : null);
 
     for (const { u, index } of stops) {
       if (u.scheduleRelationship === TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED) continue;
@@ -33,7 +42,7 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
       const platform = line.platformStations.includes(station.id)
         ? (data.stations[station.id].platforms[u.stopId ?? ""] ?? null)
         : null;
-      stations[station.id].push({ tripId, time, direction, destination, platform, cancelled });
+      stations[station.id].push({ tripId, time, direction, destination, route: match.route, platform, cancelled });
     }
   }
   for (const list of Object.values(stations)) list.sort((a, b) => a.time - b.time);
