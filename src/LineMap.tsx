@@ -12,8 +12,8 @@ const BOARD_ROOM = 220;
 interface Props {
   line: LineConfig;
   vehicles: VehicleDto[];
-  /** Stretches where buses are replacing trains right now, drawn dashed. */
-  busStretches: { from: string; to: string }[];
+  /** Stretches with no trains right now (buses replacing trains, City Loop closed), drawn dashed. */
+  closedStretches: { from: string; to: string }[];
   now: number;
   selected: string | null;
   onSelect: (stationId: string) => void;
@@ -28,7 +28,7 @@ const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor:
   r: { dx: 14, dy: 5, anchor: "start" },
 };
 
-export function LineMap({ line, vehicles, busStretches, now, selected, onSelect, board }: Props) {
+export function LineMap({ line, vehicles, closedStretches, now, selected, onSelect, board }: Props) {
   const { width, height } = line.schematic;
   const stations = line.stations;
   const last = stations[stations.length - 1];
@@ -55,7 +55,7 @@ export function LineMap({ line, vehicles, busStretches, now, selected, onSelect,
             <polyline points={line.schematic.loopClosure.join(" ")} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" />
           )}
           <path d={linePath(stations)} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" strokeLinecap="round" />
-          {busStretches.map(({ from, to }) => {
+          {closedStretches.map(({ from, to }) => {
             const a = stations.findIndex((s) => s.id === from);
             const b = stations.findIndex((s) => s.id === to);
             return a >= 0 && b > a && <path key={`${from}-${to}`} className="bus-stretch" d={linePath(stations.slice(a, b + 1))} />;
@@ -108,7 +108,7 @@ export function LineMap({ line, vehicles, busStretches, now, selected, onSelect,
             );
           })}
         </svg>
-        <Legend line={line} busStretches={busStretches} />
+        <Legend line={line} closedStretches={closedStretches} />
         {boardPos && (
           <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
             {board}
@@ -129,14 +129,14 @@ function boardPosition(s: SchematicStation, width: number) {
 
 const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
 
-function Legend({ line, busStretches }: { line: LineConfig; busStretches: unknown[] }) {
+function Legend({ line, closedStretches }: { line: LineConfig; closedStretches: unknown[] }) {
   const items: [string, string][] = [
     ["train", `${line.name} train`],
     ...(line.shared ?? []).map((s): [string, string] => ["train shared", `${s.name} train`]),
     ["train stopped", "Stopped"],
     ["train stale", "No recent update"],
   ];
-  const stretch = busStretches.length > 0;
+  const stretch = closedStretches.length > 0;
   return (
     <ul className="legend muted">
       {items.map(([cls, label]) => (
@@ -153,7 +153,7 @@ function Legend({ line, busStretches }: { line: LineConfig; busStretches: unknow
             <line x1={0} x2={28} y1={0} y2={0} stroke={line.colour} strokeWidth={8} />
             <line className="bus-stretch" x1={0} x2={28} y1={0} y2={0} />
           </svg>
-          Buses replace trains
+          No trains
         </li>
       )}
     </ul>

@@ -4,6 +4,8 @@ import { decodeFeed } from "../shared/feed";
 import { buildAlerts } from "../shared/alerts";
 import { buildDepartures } from "../shared/departures";
 import { lines } from "../shared/lines";
+import GtfsRealtimeBindings from "gtfs-realtime-bindings";
+import { calendarWeeks, disruptedDays } from "../src/calendar";
 import { matchRoute } from "../shared/routes";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
@@ -144,9 +146,9 @@ describe("buildAlerts", () => {
 
   it("keeps train disruptions only, merging the two alerts Metro posts for the same works", () => {
     expect(alerts.map((a) => a.effect)).not.toContain("OTHER_EFFECT");
-    const buses = alerts.filter((a) => a.buses);
+    const buses = alerts.filter((a) => a.kind === "buses");
     expect(buses).toHaveLength(1);
-    expect(buses[0].buses).toEqual({ from: "heidelberg", to: "greensborough" });
+    expect(buses[0].stretch).toEqual({ from: "heidelberg", to: "greensborough" });
     // The "Planned work: ..." alert's start (8:30pm), not the generic one's earlier go-live time.
     expect(buses[0].start).toBe(Date.UTC(2026, 9, 23, 9, 30) / 1000);
     expect(buses[0].description).toContain("Replacement buses are subject to local traffic");
@@ -159,5 +161,60 @@ describe("buildAlerts", () => {
       expect(a.end == null || a.end > now).toBe(true);
       expect(a.start == null || a.start < now + 7 * 24 * 3600).toBe(true);
     }
+  });
+});
+
+describe("City Loop closures", () => {
+  // Metro's wording from its planned works pages; none were in the live feed when this was written.
+  const alert = (header: string, description: string) =>
+    GtfsRealtimeBindings.transit_realtime.FeedMessage.create({
+      header: { gtfsRealtimeVersion: "2.0", timestamp: 1792800000 },
+      entity: [
+        {
+          id: "1",
+          alert: {
+            effect: GtfsRealtimeBindings.transit_realtime.Alert.Effect.MODIFIED_SERVICE,
+            activePeriod: [{ start: 1792800000, end: 1792900000 }],
+            informedEntity: [{ routeId: "aus:vic:vic-02-HBE:" }],
+            headerText: { translation: [{ text: header, language: "en" }] },
+            descriptionText: { translation: [{ text: description, language: "en" }] },
+          },
+        },
+      ],
+    });
+
+  it.each([
+    ["Planned work: Trains run direct to and from Flinders Street, not via the City Loop", ""],
+    ["Planned Works", "No City Loop trains from 9pm Friday to last train Sunday."],
+  ])("recognises %s", (header, description) => {
+    const [a] = buildAlerts(alert(header, description), hurstbridge.config, hurstbridge.data, 1792800000).alerts;
+    expect(a.kind).toBe("loop");
+    expect(a.stretch).toEqual({ from: "flinders-street", to: "parliament" });
+  });
+});
+
+describe("disruptedDays", () => {
+  // Melbourne is UTC+11 in October.
+  const melb = (d: number, h: number, m = 0) => Date.UTC(2026, 9, d, h - 11, m) / 1000;
+
+  it("marks a Friday night to Sunday closure as Friday night, then all day", () => {
+    const days = disruptedDays([{ start: melb(23, 20, 30), end: melb(25, 23, 59) }], melb(23, 12));
+    expect(Object.fromEntries(days)).toEqual({ "2026-10-23": "night", "2026-10-24": "all-day", "2026-10-25": "all-day" });
+  });
+
+  it("counts after-midnight running as the night before", () => {
+    const nights = [26, 27].map((d) => ({ start: melb(d, 20), end: melb(d + 1, 2) }));
+    expect(Object.fromEntries(disruptedDays(nights, melb(26, 12)))).toEqual({
+      "2026-10-26": "night",
+      "2026-10-27": "night",
+    });
+  });
+
+  it("lays the days out in Monday-to-Sunday weeks", () => {
+    const weeks = calendarWeeks(["2026-10-23", "2026-10-26"]);
+    expect(weeks.map((w) => [w[0], w[6]])).toEqual([
+      ["2026-10-19", "2026-10-25"],
+      ["2026-10-26", "2026-11-01"],
+    ]);
   });
 });

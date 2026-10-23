@@ -14,10 +14,13 @@ const NOTICE_EFFECTS = new Set(["OTHER_EFFECT", "UNKNOWN_EFFECT", "NO_EFFECT", "
  * "Buses replace trains between Heidelberg and Greensborough" or "...between Heidelberg to Greensborough". */
 const BUSES = /buses replace trains between ([a-z' -]+?) (?:and|to) ([a-z' -]+?)(?=$|[,.]| from | \d)/i;
 
+/** City Loop closures: "Trains run direct to and from Flinders Street, not via the City Loop", "No City Loop trains". */
+const NO_LOOP = /not via the city loop|no city loop|direct to and from flinders street/i;
+
 const text = (t: GtfsRealtimeBindings.transit_realtime.ITranslatedString | null | undefined) =>
   t?.translation?.find((x) => !x.language || x.language === "en")?.text?.trim() ?? "";
 
-function parseBuses(s: string, line: LineConfig): AlertDto["buses"] {
+function parseBuses(s: string, line: LineConfig): AlertDto["stretch"] {
   const m = BUSES.exec(s);
   if (!m) return null;
   const index = (name: string) =>
@@ -45,31 +48,36 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
     const effect = Alert.Effect[a.effect ?? Alert.Effect.UNKNOWN_EFFECT] ?? "UNKNOWN_EFFECT";
     if (NOTICE_EFFECTS.has(effect)) continue;
 
-    // The period that is running now, else the next one to start.
+    // Periods still to finish and starting within the week; the first is the one running now or next.
     const periods = (a.activePeriod ?? [])
       .map((p) => ({ start: toNum(p.start) || null, end: toNum(p.end) || null }))
-      .filter((p) => !p.end || p.end > now)
+      .filter((p) => (!p.end || p.end > now) && (!p.start || p.start <= now + LOOKAHEAD))
       .sort((x, y) => (x.start ?? 0) - (y.start ?? 0));
-    const period = periods.length ? periods[0] : a.activePeriod?.length ? null : { start: null, end: null };
-    if (!period || (period.start && period.start > now + LOOKAHEAD)) continue;
+    if (!periods.length && a.activePeriod?.length) continue;
+    const period = periods[0] ?? { start: null, end: null };
 
     const header = text(a.headerText);
     const description = text(a.descriptionText);
     const buses = parseBuses(header, line) ?? parseBuses(description, line);
+    const loop = !buses && NO_LOOP.test(`${header} ${description}`);
+    const kind: AlertDto["kind"] = buses ? "buses" : loop ? "loop" : "other";
+    const stretch = buses ?? (loop && line.cityLoop ? { from: line.cityLoop[0], to: line.cityLoop[1] } : null);
     const stations = [
       ...new Set(entities.map((e) => stationOf.get(e.stopId ?? "")).filter((s): s is string => !!s)),
     ];
-    const key = buses ? `buses:${buses.from}:${buses.to}` : `${header}\n${description}`;
+    const key = stretch ? `${kind}:${stretch.from}:${stretch.to}` : `${header}\n${description}`;
     const alert: AlertDto = {
       id: entity.id,
+      kind,
       header,
       description,
       url: text(a.url) || null,
       effect,
       start: period.start,
       end: period.end,
+      periods,
       stations,
-      buses,
+      stretch,
     };
     const existing = merged.get(key);
     merged.set(key, existing ? merge(existing, alert) : alert);
