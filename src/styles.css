@@ -58,13 +58,42 @@ main { position: relative; }
 }
 footer { margin-top: 24px; }
 
-.disruptions { margin: 0 0 12px; display: grid; gap: 6px; }
-.disruption { background: var(--panel); border-left: 4px solid #e8a200; border-radius: 4px; padding: 6px 10px; }
-.disruption.live { background: #fff3cd; color: #3d2d00; }
-.disruption.live a { color: #5c4400; }
-.alert summary { cursor: pointer; }
-.alert p { margin: 6px 0; font-size: 0.9rem; line-height: 1.4; }
-.alert-when { color: inherit; opacity: 0.75; font-size: 0.85rem; }
+/* Disruptions board, after Metro's orange-topped "Buses replace trains" posters. */
+.disruptions {
+  position: relative; margin: 0 0 12px; max-width: 520px; background: #fff; color: #111;
+  border-radius: 6px; overflow: hidden; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+.disruptions::after {
+  content: ""; position: absolute; top: 34px; right: 0; bottom: 0; width: 10px;
+  background: repeating-linear-gradient(-45deg, #f26a21 0 8px, #fff 8px 16px);
+}
+.disruptions-bar { background: #f26a21; height: 34px; display: flex; align-items: center; padding: 0 12px; }
+.bang {
+  width: 22px; height: 22px; border-radius: 50%; background: #fff; color: #f26a21;
+  display: grid; place-items: center; font-weight: 800; font-size: 15px;
+}
+.disruptions-body { padding: 4px 26px 10px 16px; }
+.notice { padding: 10px 0; border-bottom: 2px solid #4a90d9; }
+.notice:last-of-type { border-bottom: none; }
+.notice h2 { margin: 0; font-size: 1.5rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.01em; }
+.notice-sub { margin: 2px 0 8px; font-weight: 600; }
+.notice details { font-size: 0.85rem; margin-top: 6px; }
+.notice details summary { cursor: pointer; color: #555; }
+.notice details p { margin: 6px 0; line-height: 1.4; }
+.notice a { color: #0057a8; }
+.cal-month { font-weight: 700; font-size: 0.8rem; margin-bottom: 2px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 34px); gap: 3px; }
+.cal-head { font-size: 0.7rem; color: #666; text-align: center; }
+.cal-day {
+  display: inline-flex; align-items: center; justify-content: center; gap: 1px; width: 34px; height: 26px;
+  background: #eceef1; color: #888; font-size: 0.75rem; border-radius: 2px;
+}
+.cal-day.all-day { background: #f5a400; color: #fff; font-weight: 700; }
+.cal-day.night { background: #f5a400; color: #fff; font-weight: 700; }
+.cal-day .moon { font-size: 0.85rem; line-height: 1; }
+.cal-key { list-style: none; display: flex; gap: 14px; padding: 8px 0 0; margin: 0; font-size: 0.75rem; color: #444; }
+.cal-key li { display: flex; align-items: center; gap: 4px; }
+.cal-key .cal-day { width: 18px; height: 14px; }
 .bus-stretch { stroke: #ffffff; stroke-width: 3; stroke-dasharray: 6 6; fill: none; }
 .train.shared { fill: #ffffff; }
 .train.shared.stopped { fill: #0072ce; stroke: #ffffff; }

@@ -23,6 +23,8 @@ export interface LineConfig {
   routeIdMatch: string;
   /** Other lines that share track with this one, from the city end up to and including `until` (a station id). */
   shared?: { name: string; routeIdMatch: string; until: string }[];
+  /** First and last station of the City Loop section, skipped when trains run direct to Flinders Street. */
+  cityLoop?: [string, string];
   /** Stations whose departures show a platform number. */
   platformStations: string[];
   /** Size of the schematic drawing in px, and any extra track drawn but not used for placing trains. */
@@ -82,18 +84,22 @@ export interface DeparturesResponse {
 
 export interface AlertDto {
   id: string;
+  /** "buses": buses replace trains on `stretch`; "loop": trains run direct to Flinders Street, not via the City Loop. */
+  kind: "buses" | "loop" | "other";
   header: string;
   description: string;
   url: string | null;
-  /** GTFS-R effect, e.g. REDUCED_SERVICE; station notices (car parks, lifts) are OTHER_EFFECT. */
+  /** GTFS-R effect, e.g. REDUCED_SERVICE or MODIFIED_SERVICE. */
   effect: string;
-  /** Unix seconds; null when open-ended. */
+  /** Unix seconds of the current or next period; null when open-ended. */
   start: number | null;
   end: number | null;
+  /** Every period from now until a week ahead, for the calendar. */
+  periods: { start: number | null; end: number | null }[];
   /** Station ids named in the alert, when it's about particular stations. */
   stations: string[];
-  /** For "Buses replace trains between X and Y" works: the two station ids, city end first. */
-  buses: { from: string; to: string } | null;
+  /** The stretch of line with no trains (city end first), for buses and City Loop closures. */
+  stretch: { from: string; to: string } | null;
 }
 
 export interface AlertsResponse {

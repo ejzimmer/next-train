@@ -5,6 +5,7 @@
   "colour": "#BE1014",
   "routeIdMatch": "-HBE:",
   "shared": [{ "name": "Mernda", "routeIdMatch": "-MDD:", "until": "clifton-hill" }],
+  "cityLoop": ["flinders-street", "parliament"],
   "platformStations": [
     "flinders-street",
     "southern-cross"
