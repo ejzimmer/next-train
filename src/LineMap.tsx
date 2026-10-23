@@ -12,6 +12,8 @@ const BOARD_ROOM = 220;
 interface Props {
   line: LineConfig;
   vehicles: VehicleDto[];
+  /** Stretches where buses are replacing trains right now, drawn dashed. */
+  busStretches: { from: string; to: string }[];
   now: number;
   selected: string | null;
   onSelect: (stationId: string) => void;
@@ -26,7 +28,7 @@ const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor:
   r: { dx: 14, dy: 5, anchor: "start" },
 };
 
-export function LineMap({ line, vehicles, now, selected, onSelect, board }: Props) {
+export function LineMap({ line, vehicles, busStretches, now, selected, onSelect, board }: Props) {
   const { width, height } = line.schematic;
   const stations = line.stations;
   const last = stations[stations.length - 1];
@@ -53,6 +55,11 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             <polyline points={line.schematic.loopClosure.join(" ")} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" />
           )}
           <path d={linePath(stations)} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" strokeLinecap="round" />
+          {busStretches.map(({ from, to }) => {
+            const a = stations.findIndex((s) => s.id === from);
+            const b = stations.findIndex((s) => s.id === to);
+            return a >= 0 && b > a && <path key={`${from}-${to}`} className="bus-stretch" d={linePath(stations.slice(a, b + 1))} />;
+          })}
           <line x1={last.x} x2={last.x} y1={last.y - 10} y2={last.y + 10} stroke={line.colour} strokeWidth={6} />
           {stations.map((s) => {
             const l = LABEL[s.label];
@@ -82,14 +89,15 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             return (
               <g
                 key={v.id}
-                className={`train${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                className={`train${v.route ? " shared" : ""}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
               >
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
-                {v.direction ? <path d="M14,0 L-10,-11 L-5,0 L-10,11 Z" /> : <circle r={6} />}
+                {v.direction ? <path d={ARROW} /> : <circle r={6} />}
                 <title>
                   {[
-                    v.direction === "outbound" ? `To ${line.name}` : v.direction === "citybound" ? "To the city" : "Train",
+                    `${v.route ?? line.name} train` +
+                      (v.direction === "outbound" ? ` to ${v.route ?? line.name}` : v.direction ? " to the city" : ""),
                     v.trainType && `${v.cars} car ${v.trainType}`,
                     stopped.has(v.id) && "stopped",
                   ]
@@ -100,6 +108,7 @@ export function LineMap({ line, vehicles, now, selected, onSelect, board }: Prop
             );
           })}
         </svg>
+        <Legend line={line} busStretches={busStretches} />
         {boardPos && (
           <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
             {board}
@@ -116,4 +125,37 @@ function boardPosition(s: SchematicStation, width: number) {
   if (s.label === "r" && besideLabel + BOARD_WIDTH <= width) return { left: besideLabel, top: s.y - 22 };
   const below = s.label === "t" || s.label === "b" ? 40 : 20;
   return { left: Math.max(0, Math.min(width - BOARD_WIDTH, s.x - 60)), top: s.y + below };
+}
+
+const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
+
+function Legend({ line, busStretches }: { line: LineConfig; busStretches: unknown[] }) {
+  const items: [string, string][] = [
+    ["train", `${line.name} train`],
+    ...(line.shared ?? []).map((s): [string, string] => ["train shared", `${s.name} train`]),
+    ["train stopped", "Stopped"],
+    ["train stale", "No recent update"],
+  ];
+  const stretch = busStretches.length > 0;
+  return (
+    <ul className="legend muted">
+      {items.map(([cls, label]) => (
+        <li key={label}>
+          <svg width={28} height={24} viewBox="-14 -12 28 24" aria-hidden>
+            <path className={cls} d={ARROW} />
+          </svg>
+          {label}
+        </li>
+      ))}
+      {stretch && (
+        <li>
+          <svg width={28} height={24} viewBox="0 -12 28 24" aria-hidden>
+            <line x1={0} x2={28} y1={0} y2={0} stroke={line.colour} strokeWidth={8} />
+            <line className="bus-stretch" x1={0} x2={28} y1={0} y2={0} />
+          </svg>
+          Buses replace trains
+        </li>
+      )}
+    </ul>
+  );
 }

@@ -57,3 +57,19 @@ main { position: relative; }
   border: none; background: #222; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;
 }
 footer { margin-top: 24px; }
+
+.disruptions { margin: 0 0 12px; display: grid; gap: 6px; }
+.disruption { background: var(--panel); border-left: 4px solid #e8a200; border-radius: 4px; padding: 6px 10px; }
+.disruption.live { background: #fff3cd; color: #3d2d00; }
+.disruption.live a { color: #5c4400; }
+.alert summary { cursor: pointer; }
+.alert p { margin: 6px 0; font-size: 0.9rem; line-height: 1.4; }
+.alert-when { color: inherit; opacity: 0.75; font-size: 0.85rem; }
+.bus-stretch { stroke: #ffffff; stroke-width: 3; stroke-dasharray: 6 6; fill: none; }
+.train.shared { fill: #ffffff; }
+.train.shared.stopped { fill: #0072ce; stroke: #ffffff; }
+.train.shared.stale { fill: #c9c9c9; stroke: #7a8a99; }
+.legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 0; margin: 4px 0 0; }
+.legend li { display: flex; align-items: center; gap: 4px; }
+.legend svg { overflow: visible; }
+.legend .train { transition: none; }

@@ -4,6 +4,7 @@
   "name": "Hurstbridge",
   "colour": "#BE1014",
   "routeIdMatch": "-HBE:",
+  "shared": [{ "name": "Mernda", "routeIdMatch": "-MDD:", "until": "clifton-hill" }],
   "platformStations": [
     "flinders-street",
     "southern-cross"

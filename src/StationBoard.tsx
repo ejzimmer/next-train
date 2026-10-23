@@ -25,7 +25,8 @@ function minutes(time: number, now: number) {
 
 /** The "following trains" list from a Metro platform display, in the line's colour. */
 export function StationBoard({ line, departures, vehicles, now, onClose }: Props) {
-  const name = (id: string | null) => line.stations.find((s) => s.id === id)?.name ?? "";
+  // Shared-line trains can terminate off our line, in which case the destination is already a name.
+  const name = (id: string | null) => line.stations.find((s) => s.id === id)?.name ?? id ?? "";
   const upcoming = (departures ?? []).filter((d) => d.time >= now - 30).slice(0, 4);
   const vehicleFor = (tripId: string) => vehicles.find((v) => v.tripId === tripId);
 
@@ -44,7 +45,7 @@ export function StationBoard({ line, departures, vehicles, now, onClose }: Props
           return (
             <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: line.colour }}>
               <span className="pid-time">{formatTime(d.time)}</span>
-              <span className="pid-dest" title={v?.trainType ? `${v.cars} car ${v.trainType}` : undefined}>
+              <span className="pid-dest" title={[d.route && `${d.route} line`, v?.trainType && `${v.cars} car ${v.trainType}`].filter(Boolean).join(", ") || undefined}>
                 {name(d.destination)}
               </span>
               {d.platform && <span className="pid-detail">Plat {d.platform}</span>}

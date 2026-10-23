@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import hurstbridge from "../lines/hurstbridge.json";
 import stationData from "../data/hurstbridge.stations.json";
-import type { DeparturesResponse, LineConfig, VehiclesResponse } from "../shared/types";
+import type { AlertsResponse, DeparturesResponse, LineConfig, VehiclesResponse } from "../shared/types";
+import { Disruptions } from "./Disruptions";
 import { LineMap } from "./LineMap";
 import { StationBoard } from "./StationBoard";
 import { useNow, usePoll } from "./usePoll";
 
 const line = hurstbridge as LineConfig;
-const POLL_MS = 60_000;
+/** About three times a minute; the API allows 24 calls a minute per feed. */
+const POLL_MS = 20_000;
+const ALERTS_POLL_MS = 2 * 60_000;
 
 function stationFromUrl() {
   return new URLSearchParams(location.search).get("station");
@@ -17,7 +20,8 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(stationFromUrl);
   const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?line=${line.id}`, POLL_MS);
   const departures = usePoll<DeparturesResponse>(`/api/departures?line=${line.id}`, POLL_MS);
-  const now = useNow(15_000);
+  const alerts = usePoll<AlertsResponse>(`/api/alerts?line=${line.id}`, ALERTS_POLL_MS);
+  const now = useNow(10_000);
   const hasStations = Object.keys(stationData.stations).length > 0;
 
   const select = useCallback((id: string | null) => {
@@ -52,11 +56,15 @@ export function App() {
           {vehicles.error ? "Live data unavailable, retrying" : updated ? `Updated ${updated}` : "Loading live data…"}
         </p>
       </header>
+      <Disruptions line={line} alerts={alerts.data?.alerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
         <LineMap
           line={line}
           vehicles={vehicles.data?.vehicles ?? []}
+          busStretches={(alerts.data?.alerts ?? [])
+            .filter((a) => a.buses && (!a.start || a.start <= now))
+            .map((a) => a.buses!)}
           now={now}
           selected={selected}
           onSelect={select}

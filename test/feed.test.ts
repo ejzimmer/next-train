@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { decodeFeed } from "../shared/feed";
+import { buildAlerts } from "../shared/alerts";
 import { buildDepartures } from "../shared/departures";
+import { lines } from "../shared/lines";
+import { matchRoute } from "../shared/routes";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
 import { trainType } from "../shared/trainType";
@@ -98,5 +101,63 @@ describe("trainType", () => {
   it("recognises every train in the saved feed", () => {
     const unknown = vehiclesFeed.entity.map((e) => e.vehicle?.vehicle?.id ?? "").filter((id) => !trainType(id).type);
     expect(unknown).toEqual([]);
+  });
+});
+
+// Saved on 2026-10-23 around 21:10 Melbourne time, during Heidelberg–Greensborough bus replacement works.
+const vehiclesFeed23 = decodeFeed(readFileSync(new URL("./fixtures/vehicle-positions-2026-10-23.pb", import.meta.url)));
+const alertsFeed = decodeFeed(readFileSync(new URL("./fixtures/service-alerts.pb", import.meta.url)));
+const hurstbridge = lines.hurstbridge;
+
+describe("matchRoute", () => {
+  it("knows the line's own routes and the shared Mernda route, but not replacement buses", () => {
+    const cfg = hurstbridge.config;
+    expect(matchRoute("aus:vic:vic-02-HBE:", cfg)).toEqual({ route: null, until: cfg.stations.length - 1 });
+    expect(matchRoute("aus:vic:vic-02-MDD:", cfg)).toEqual({ route: "Mernda", until: 10 });
+    expect(matchRoute("aus:vic:vic-02-HBE-R:", cfg)).toBeNull();
+    expect(matchRoute("aus:vic:vic-02-SUY:", cfg)).toBeNull();
+  });
+});
+
+describe("buildVehicles with shared track", () => {
+  const res = buildVehicles(vehiclesFeed23, hurstbridge.config, hurstbridge.data);
+
+  it("shows Mernda trains only between the city and Clifton Hill", () => {
+    const mernda = res.vehicles.filter((v) => v.route === "Mernda");
+    expect(mernda.length).toBeGreaterThan(0);
+    for (const v of mernda) expect(v.segment).toBeLessThan(10);
+    // Mernda trains up near Thomastown are on their own line, not ours.
+    expect(res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1166")).toBeUndefined();
+    expect(res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1769")?.direction).toBe("outbound");
+  });
+
+  it("lists a train once when it's reported against two trips", () => {
+    const ids = res.vehicles.map((v) => v.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids).toContain("1372T-1436T-143M-144M-271M-272M");
+  });
+});
+
+describe("buildAlerts", () => {
+  const now = Number(alertsFeed.header.timestamp);
+  const { alerts } = buildAlerts(alertsFeed, hurstbridge.config, hurstbridge.data, now);
+
+  it("keeps train disruptions only, merging the two alerts Metro posts for the same works", () => {
+    expect(alerts.map((a) => a.effect)).not.toContain("OTHER_EFFECT");
+    const buses = alerts.filter((a) => a.buses);
+    expect(buses).toHaveLength(1);
+    expect(buses[0].buses).toEqual({ from: "heidelberg", to: "greensborough" });
+    // The "Planned work: ..." alert's start (8:30pm), not the generic one's earlier go-live time.
+    expect(buses[0].start).toBe(Date.UTC(2026, 9, 23, 9, 30) / 1000);
+    expect(buses[0].description).toContain("Replacement buses are subject to local traffic");
+    // Other lines' works aren't included.
+    expect(alerts.some((a) => a.description.includes("Sunbury line services"))).toBe(false);
+  });
+
+  it("drops alerts that have ended or start more than a week away", () => {
+    for (const a of alerts) {
+      expect(a.end == null || a.end > now).toBe(true);
+      expect(a.start == null || a.start < now + 7 * 24 * 3600).toBe(true);
+    }
   });
 });

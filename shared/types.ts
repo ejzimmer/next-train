@@ -21,6 +21,8 @@ export interface LineConfig {
   colour: string;
   /** Substring matched against GTFS-R route_id, e.g. "-HBE:" for aus:vic:vic-02-HBE: */
   routeIdMatch: string;
+  /** Other lines that share track with this one, from the city end up to and including `until` (a station id). */
+  shared?: { name: string; routeIdMatch: string; until: string }[];
   /** Stations whose departures show a platform number. */
   platformStations: string[];
   /** Size of the schematic drawing in px, and any extra track drawn but not used for placing trains. */
@@ -35,13 +37,16 @@ export interface LineData {
     string,
     { lat: number; lon: number; stopIds: string[]; platforms: Record<string, string> }
   >;
-  /** Static trips on this line: direction and terminating station id. */
+  /** Static trips on this line and shared lines: direction, and the terminating station id
+   * (or the terminus name when it's off this line, e.g. "Mernda"). */
   trips: Record<string, { dir: Direction; dest: string }>;
 }
 
 export interface VehicleDto {
   id: string;
   tripId: string;
+  /** Name of the shared line this train is running on, or null for this line's own trains. */
+  route: string | null;
   /** Unix seconds of the position report. */
   timestamp: number;
   direction: Direction | null;
@@ -58,7 +63,9 @@ export interface DepartureDto {
   /** Unix seconds. */
   time: number;
   direction: Direction | null;
+  /** Station id on this line, or a terminus name off it. */
   destination: string | null;
+  route: string | null;
   platform: string | null;
   cancelled: boolean;
 }
@@ -71,4 +78,25 @@ export interface VehiclesResponse {
 export interface DeparturesResponse {
   feedTimestamp: number;
   stations: Record<string, DepartureDto[]>;
+}
+
+export interface AlertDto {
+  id: string;
+  header: string;
+  description: string;
+  url: string | null;
+  /** GTFS-R effect, e.g. REDUCED_SERVICE; station notices (car parks, lifts) are OTHER_EFFECT. */
+  effect: string;
+  /** Unix seconds; null when open-ended. */
+  start: number | null;
+  end: number | null;
+  /** Station ids named in the alert, when it's about particular stations. */
+  stations: string[];
+  /** For "Buses replace trains between X and Y" works: the two station ids, city end first. */
+  buses: { from: string; to: string } | null;
+}
+
+export interface AlertsResponse {
+  feedTimestamp: number;
+  alerts: AlertDto[];
 }
