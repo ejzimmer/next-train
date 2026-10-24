@@ -1,9 +1,8 @@
-import type { DepartureDto, LineConfig, VehicleDto } from "../shared/types";
+import type { DepartureDto, LineConfig } from "../shared/types";
 
 interface Props {
   line: LineConfig;
   departures: DepartureDto[] | undefined;
-  vehicles: VehicleDto[];
   now: number;
   onClose: () => void;
 }
@@ -24,11 +23,10 @@ function minutes(time: number, now: number) {
 }
 
 /** The "following trains" list from a Metro platform display, in the line's colour. */
-export function StationBoard({ line, departures, vehicles, now, onClose }: Props) {
+export function StationBoard({ line, departures, now, onClose }: Props) {
   // Shared-line trains can terminate off our line, in which case the destination is already a name.
   const name = (id: string | null) => line.stations.find((s) => s.id === id)?.name ?? id ?? "";
   const upcoming = (departures ?? []).filter((d) => d.time >= now - 30).slice(0, 4);
-  const vehicleFor = (tripId: string) => vehicles.find((v) => v.tripId === tripId);
 
   return (
     <div className="pid" role="dialog" aria-label="Next trains" style={{ borderTopColor: line.colour }}>
@@ -40,19 +38,16 @@ export function StationBoard({ line, departures, vehicles, now, onClose }: Props
       ) : upcoming.length === 0 ? (
         <p className="pid-empty">No trains in the live feed</p>
       ) : (
-        upcoming.map((d) => {
-          const v = vehicleFor(d.tripId);
-          return (
-            <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: line.colour }}>
-              <span className="pid-time">{formatTime(d.time)}</span>
-              <span className="pid-dest" title={[d.route && `${d.route} line`, v?.trainType && `${v.cars} car ${v.trainType}`].filter(Boolean).join(", ") || undefined}>
-                {name(d.destination)}
-              </span>
-              {d.platform && <span className="pid-detail">Plat {d.platform}</span>}
-              <span className="pid-mins">{d.cancelled ? "Cancelled" : minutes(d.time, now)}</span>
-            </div>
-          );
-        })
+        upcoming.map((d) => (
+          <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: line.colour }}>
+            <span className="pid-time">{formatTime(d.time)}</span>
+            <span className="pid-dest" title={d.route ? `${d.route} line` : undefined}>
+              {name(d.destination)}
+            </span>
+            {d.platform && <span className="pid-detail">Plat {d.platform}</span>}
+            <span className="pid-mins">{d.cancelled ? "Cancelled" : minutes(d.time, now)}</span>
+          </div>
+        ))
       )}
     </div>
   );

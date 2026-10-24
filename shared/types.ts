@@ -49,6 +49,8 @@ export interface VehicleDto {
   tripId: string;
   /** Name of the shared line this train is running on, or null for this line's own trains. */
   route: string | null;
+  /** Where this trip terminates from the static timetable (station id, or a name off our line); null if unknown. */
+  destination: string | null;
   /** Unix seconds of the position report. */
   timestamp: number;
   direction: Direction | null;
