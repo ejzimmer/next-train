@@ -5,6 +5,9 @@ import type { DepartureDto, DeparturesResponse, Direction, LineConfig, LineData 
 
 const { TripDescriptor, TripUpdate } = GtfsRealtimeBindings.transit_realtime;
 
+/** How long after its predicted time a departure is still sent to the app (seconds). */
+export const LATE_GRACE = 10 * 60;
+
 export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineData, now: number): DeparturesResponse {
   const stationOf = new Map<string, number>();
   line.stations.forEach((s, i) => data.stations[s.id]?.stopIds.forEach((stop) => stationOf.set(stop, i)));
@@ -38,7 +41,8 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
       const station = line.stations[index];
       // Departure time where given; arrival time at the terminus.
       const time = toNum(u.departure?.time) || toNum(u.arrival?.time);
-      if (!time || time < now - 30 || station.id === destination) continue;
+      // Recently-due departures stay in, so the board can keep a train that is late leaving.
+      if (!time || time < now - LATE_GRACE || station.id === destination) continue;
       const platform = line.platformStations.includes(station.id)
         ? (data.stations[station.id].platforms[u.stopId ?? ""] ?? null)
         : null;

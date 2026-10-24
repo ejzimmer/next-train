@@ -78,6 +78,8 @@ export function App() {
                 <StationBoard
                   line={line}
                   departures={departures.data?.stations[selected]}
+                  stationIndex={line.stations.findIndex((s) => s.id === selected)}
+                  vehicles={vehicles.data?.vehicles ?? []}
                   now={now}
                   onClose={() => select(null)}
                 />
