@@ -4,6 +4,7 @@ import stationData from "../data/hurstbridge.stations.json";
 import type { AlertsResponse, DeparturesResponse, LineConfig, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
 import { LineMap } from "./LineMap";
+import { Loading } from "./Loading";
 import { StationBoard } from "./StationBoard";
 import { useNow, usePoll } from "./usePoll";
 
@@ -59,27 +60,31 @@ export function App() {
       <Disruptions line={line} alerts={alerts.data?.alerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
-        <LineMap
-          line={line}
-          vehicles={vehicles.data?.vehicles ?? []}
-          closedStretches={(alerts.data?.alerts ?? [])
-            .filter((a) => a.stretch && (!a.start || a.start <= now))
-            .map((a) => a.stretch!)}
-          now={now}
-          selected={selected}
-          onSelect={select}
-          board={
-            selected && (
-              <StationBoard
-                line={line}
-                departures={departures.data?.stations[selected]}
-                vehicles={vehicles.data?.vehicles ?? []}
-                now={now}
-                onClose={() => select(null)}
-              />
-            )
-          }
-        />
+        {!vehicles.data && !vehicles.error ? (
+          <Loading />
+        ) : (
+          <LineMap
+            line={line}
+            vehicles={vehicles.data?.vehicles ?? []}
+            closedStretches={(alerts.data?.alerts ?? [])
+              .filter((a) => a.stretch && (!a.start || a.start <= now))
+              .map((a) => a.stretch!)}
+            now={now}
+            selected={selected}
+            onSelect={select}
+            board={
+              selected && (
+                <StationBoard
+                  line={line}
+                  departures={departures.data?.stations[selected]}
+                  vehicles={vehicles.data?.vehicles ?? []}
+                  now={now}
+                  onClose={() => select(null)}
+                />
+              )
+            }
+          />
+        )}
       </main>
       <footer className="muted">
         Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence.

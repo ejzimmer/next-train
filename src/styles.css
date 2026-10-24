@@ -91,10 +91,11 @@ footer { margin-top: 24px; }
 }
 .cal-day.all-day { background: #f5a400; color: #fff; font-weight: 700; }
 .cal-day.night { background: #f5a400; color: #fff; font-weight: 700; }
-.cal-day .moon { font-size: 0.85rem; line-height: 1; }
+.cal-day .moon { width: 12px; height: 12px; flex: none; }
 .cal-key { list-style: none; display: flex; gap: 14px; padding: 8px 0 0; margin: 0; font-size: 0.75rem; color: #444; }
 .cal-key li { display: flex; align-items: center; gap: 4px; }
-.cal-key .cal-day { width: 18px; height: 14px; }
+.cal-key .cal-day { width: 24px; height: 20px; }
+.cal-key .moon { width: 14px; height: 14px; }
 .bus-stretch { stroke: #ffffff; stroke-width: 3; stroke-dasharray: 6 6; fill: none; }
 .train.shared { fill: #ffffff; }
 .train.shared.stopped { fill: #0072ce; stroke: #ffffff; }
@@ -104,3 +105,22 @@ footer { margin-top: 24px; }
 .legend svg { overflow: visible; }
 .legend .train { transition: none; }
 .notice h2 + .cal { margin-top: 6px; }
+
+/* Loading screen: a cartoon X'Trapolis running across. */
+.loading { padding: 48px 0; text-align: center; overflow: hidden; }
+.loading-track { position: relative; height: 72px; margin: 0 -16px; border-bottom: 3px solid var(--muted); overflow: hidden; }
+.xt { position: absolute; bottom: 0; left: 0; animation: xt-run 3.2s linear infinite; }
+.xt-body { fill: #d9dde2; stroke: #5b6470; stroke-width: 1.5; }
+.xt-windows { fill: #1f2a36; }
+.xt-door { fill: #0072ce; }
+.xt-stripe { fill: #ffd400; }
+.xt-light { fill: #fff6a8; }
+.xt-wheel circle { fill: #333; }
+.xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
+.xt-wheel { animation: xt-spin 0.4s linear infinite; }
+@keyframes xt-run { from { transform: translateX(-360px); } to { transform: translateX(100vw); } }
+@keyframes xt-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .xt { animation: none; left: 50%; transform: translateX(-50%); }
+  .xt-wheel { animation: none; }
+}
