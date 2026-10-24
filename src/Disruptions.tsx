@@ -16,6 +16,15 @@ const clock = new Intl.DateTimeFormat("en-AU", {
 const time = (unix: number) => clock.format(unix * 1000).replace(/\s/g, "").replace(":00", "").toLowerCase();
 const monthName = (date: string) =>
   new Date(`${date}T00:00:00Z`).toLocaleString("en-AU", { month: "long", timeZone: "UTC" });
+/** Filled crescent, drawn rather than a ☾ character so it's solid in every font. */
+function Moon() {
+  return (
+    <svg className="moon" viewBox="0 0 24 24" aria-label="night only" role="img">
+      <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function headline(alert: AlertDto, name: (id: string) => string) {
@@ -43,7 +52,7 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
           const kind = days.get(d);
           return (
             <span key={d} className={`cal-day${kind ? ` ${kind}` : ""}`} title={kind === "night" ? "Night only" : kind && "All day"}>
-              {kind === "night" && <span className="moon" aria-label="night only">☾</span>}
+              {kind === "night" && <Moon />}
               {Number(d.slice(8))}
             </span>
           );
@@ -112,7 +121,7 @@ export function Disruptions({ line, alerts, now }: Props) {
           {hasNight && (
             <li>
               <span className="cal-day night">
-                <span className="moon">☾</span>
+                <Moon />
               </span>{" "}
               Night only
             </li>
