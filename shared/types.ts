@@ -42,6 +42,15 @@ export interface LineData {
   /** Static trips on this line and shared lines: direction, and the terminating station id
    * (or the terminus name when it's off this line, e.g. "Mernda"). */
   trips: Record<string, { dir: Direction; dest: string }>;
+  /** Scheduled times, for filling in stops the realtime feed leaves out. */
+  times?: LineTimes;
+}
+
+export interface LineTimes {
+  /** Stops on this line as [stop_sequence, stop_id, seconds after the trip's first stop here]. */
+  patterns: [number, string, number][][];
+  /** Each trip's pattern index and scheduled time at its first stop here (seconds after midnight). */
+  trips: Record<string, [number, number]>;
 }
 
 export interface VehicleDto {
