@@ -108,17 +108,20 @@ footer { margin-top: 24px; }
 
 /* Loading screen: a cartoon X'Trapolis running across. */
 .loading { padding: 48px 0; text-align: center; overflow: hidden; }
-.loading-track { position: relative; height: 72px; margin: 0 -16px; border-bottom: 3px solid var(--muted); overflow: hidden; }
+.loading-track { position: relative; height: 66px; margin: 0 -16px; border-bottom: 3px solid var(--muted); overflow: hidden; }
 .xt { position: absolute; bottom: 0; left: 0; animation: xt-run 3.2s linear infinite; }
-.xt-body { fill: #d9dde2; stroke: #5b6470; stroke-width: 1.5; }
-.xt-windows { fill: #1f2a36; }
-.xt-door { fill: #0072ce; }
-.xt-stripe { fill: #ffd400; }
-.xt-light { fill: #fff6a8; }
+.xt-body { fill: #f2f4f6; stroke: #4d5866; stroke-width: 1; }
+.xt-roof { fill: #b9c1ca; }
+.xt-blue { fill: #1f6fd1; }
+.xt-blue-light { fill: #4ea3ee; }
+.xt-door { fill: #1559b0; stroke: #0d3f80; stroke-width: 0.6; }
+.xt-windows { fill: #1c2530; }
+.xt-cab { fill: #ffc20e; stroke: #4d5866; stroke-width: 1; }
+.xt-light { fill: #fffbe0; }
 .xt-wheel circle { fill: #333; }
 .xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
 .xt-wheel { animation: xt-spin 0.4s linear infinite; }
-@keyframes xt-run { from { transform: translateX(-360px); } to { transform: translateX(100vw); } }
+@keyframes xt-run { from { transform: translateX(-100%); } to { transform: translateX(100vw); } }
 @keyframes xt-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .xt { animation: none; left: 50%; transform: translateX(-50%); }
