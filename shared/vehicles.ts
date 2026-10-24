@@ -9,6 +9,11 @@ const MAX_OFF_LINE = 1500;
 /** Shared-line trains must be closer, so ones that have turned off towards their own line drop out. */
 const MAX_OFF_SHARED = 300;
 
+/** Scheduled start of a trip, in seconds after midnight (-1 when unknown). */
+function startOf(tripId: string, data: LineData) {
+  return data.times?.trips[tripId]?.[1] ?? -1;
+}
+
 export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineData): VehiclesResponse {
   const byId = new Map<string, VehicleDto>();
   for (const entity of feed.entity) {
@@ -29,9 +34,11 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
     const id = v.vehicle?.id || entity.id;
     const { type, cars } = trainType(id);
     const timestamp = toNum(v.timestamp);
-    // The same train can briefly be reported against its old and next trip: keep the newer report.
+    // The same train can be reported against its old and next trip: keep the newer report, or
+    // when both carry the same time, the later-starting trip, so the map doesn't flip between them.
     const existing = byId.get(id);
-    if (existing && existing.timestamp >= timestamp) continue;
+    if (existing && existing.timestamp > timestamp) continue;
+    if (existing && existing.timestamp === timestamp && startOf(existing.tripId, data) >= startOf(tripId, data)) continue;
     byId.set(id, {
       id,
       tripId,

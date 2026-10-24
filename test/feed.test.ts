@@ -141,6 +141,29 @@ describe("buildVehicles with shared track", () => {
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toContain("1372T-1436T-143M-144M-271M-272M");
   });
+
+  it("picks the later trip, whatever the feed order, when both reports carry the same time", () => {
+    // Seen at Eltham on 2026-10-25: 1299 had terminated there and the same train was booked as 1392.
+    const { lat, lon } = hurstbridge.data.stations.eltham;
+    const report = (tripId: string) => ({
+      id: tripId,
+      vehicle: {
+        trip: { tripId, routeId: "aus:vic:vic-02-HBE:" },
+        vehicle: { id: "1001M-1601T-1002M-1003M-1602T-1004M" },
+        position: { latitude: lat, longitude: lon },
+        timestamp: 1792792314,
+      },
+    });
+    const feed = (...tripIds: string[]) =>
+      GtfsRealtimeBindings.transit_realtime.FeedMessage.create({
+        header: { gtfsRealtimeVersion: "2.0", timestamp: 1792792330 },
+        entity: tripIds.map(report),
+      });
+    for (const order of [["02-HBE--72-T3-1299", "02-HBE--72-T3-1392"], ["02-HBE--72-T3-1392", "02-HBE--72-T3-1299"]]) {
+      const { vehicles } = buildVehicles(feed(...order), hurstbridge.config, hurstbridge.data);
+      expect(vehicles.map((v) => v.tripId)).toEqual(["02-HBE--72-T3-1392"]);
+    }
+  });
 });
 
 describe("buildAlerts", () => {
