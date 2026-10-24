@@ -9,7 +9,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
 import { parse } from "csv-parse/sync";
-import type { Direction, LineConfig, LineData } from "../shared/types";
+import type { Direction, LineConfig, LineData, LineTimes } from "../shared/types";
 import hurstbridge from "../lines/hurstbridge.json";
 
 const DEFAULT_SOURCE = "https://data.ptv.vic.gov.au/downloads/gtfs.zip";
@@ -74,9 +74,14 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
   // For each trip: its last stop, and its first and last stops on our line.
   type End = [seq: number, stop: string];
   const ends = new Map<string, { last: End; firstOn?: End; lastOn?: End }>();
+  // Scheduled departure (seconds after midnight) at each of a trip's stops on our line.
+  const schedule = new Map<string, [seq: number, stop: string, time: number][]>();
   const text = strFromU8(files["stop_times.txt"]);
   const header = text.slice(0, text.indexOf("\n")).replace(/^\uFEFF/, "").trim().split(",");
-  const [ti, si, qi] = ["trip_id", "stop_id", "stop_sequence"].map((c) => header.indexOf(c));
+  const [ti, si, qi, ai, di] = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((c) =>
+    header.indexOf(c),
+  );
+  const seconds = (hms: string) => hms.split(":").reduce((t, part) => t * 60 + Number(part), 0);
   for (const row of text.split("\n")) {
     const cols = row.split(",");
     const tripId = cols[ti]?.replace(/"/g, "");
@@ -88,6 +93,8 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
     if (stationOfStop.has(end[1])) {
       if (!e.firstOn || end[0] < e.firstOn[0]) e.firstOn = end;
       if (!e.lastOn || end[0] > e.lastOn[0]) e.lastOn = end;
+      const time = (cols[di] || cols[ai])?.replace(/"/g, "");
+      if (time) schedule.set(tripId, [...(schedule.get(tripId) ?? []), [...end, seconds(time)]]);
     }
   }
 
@@ -112,6 +119,22 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
     JSON.stringify({ generatedAt: new Date().toISOString(), stations }, null, 2) + "\n",
   );
   writeFileSync(`data/${line.id}.trips.json`, JSON.stringify(trips) + "\n");
+
+  // Many trips share a stopping pattern and running times, so store each pattern once
+  // (times relative to the first stop) and give each trip its pattern and start time.
+  const times: LineTimes = { patterns: [], trips: {} };
+  const patternIndex = new Map<string, number>();
+  for (const [tripId, stopsOn] of schedule) {
+    if (!trips[tripId]) continue;
+    stopsOn.sort((a, b) => a[0] - b[0]);
+    const start = stopsOn[0][2];
+    const pattern = stopsOn.map(([seq, stop, time]): [number, string, number] => [seq, stop, time - start]);
+    const key = JSON.stringify(pattern);
+    if (!patternIndex.has(key)) patternIndex.set(key, times.patterns.push(pattern) - 1);
+    times.trips[tripId] = [patternIndex.get(key)!, start];
+  }
+  console.log(`${times.patterns.length} stopping patterns`);
+  writeFileSync(`data/${line.id}.times.json`, JSON.stringify(times) + "\n");
 }
 
 const outer = unzipSync(await load(process.argv[2] ?? DEFAULT_SOURCE));

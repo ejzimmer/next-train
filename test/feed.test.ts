@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { decodeFeed } from "../shared/feed";
 import { buildAlerts } from "../shared/alerts";
-import { buildDepartures } from "../shared/departures";
+import { buildDepartures, withScheduledGaps } from "../shared/departures";
 import { lines } from "../shared/lines";
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { calendarWeeks, disruptedDays } from "../src/calendar";
@@ -10,7 +10,7 @@ import { matchRoute } from "../shared/routes";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
 import { trainType } from "../shared/trainType";
-import type { LineConfig, LineData } from "../shared/types";
+import type { LineConfig, LineData, LineTimes } from "../shared/types";
 
 // Snapshots of the live Metro feeds saved on 2026-10-17 around 22:00 Melbourne time.
 const vehiclesFeed = decodeFeed(readFileSync(new URL("./fixtures/vehicle-positions.pb", import.meta.url)));
@@ -219,5 +219,29 @@ describe("disruptedDays", () => {
       ["2026-10-19", "2026-10-25"],
       ["2026-10-26", "2026-11-01"],
     ]);
+  });
+});
+
+describe("withScheduledGaps", () => {
+  const { StopTimeUpdate } = GtfsRealtimeBindings.transit_realtime.TripUpdate;
+  const times = { patterns: [[[1, "s1", 0], [2, "s2", 180], [3, "s3", 900], [4, "s4", 1140]]], trips: { t: [0, 1000] } } as LineTimes;
+
+  it("fills a skipped stop with the previous stop's delay", () => {
+    const updates = [
+      StopTimeUpdate.create({ stopSequence: 2, stopId: "s2", departure: { time: 1300 } }),
+      StopTimeUpdate.create({ stopSequence: 4, stopId: "s4", arrival: { time: 2260 } }),
+    ];
+    const filled = withScheduledGaps(updates, times, "t");
+    // Scheduled 1180 at s2 but leaving 1300: two minutes late, so s3 at 1900 + 120.
+    expect(filled.map((u) => [u.stopId, u.departure?.time ?? u.arrival?.time])).toEqual([
+      ["s2", 1300],
+      ["s3", 2020],
+      ["s4", 2260],
+    ]);
+  });
+
+  it("leaves trips without a timetable alone", () => {
+    const updates = [StopTimeUpdate.create({ stopSequence: 2, stopId: "s2", departure: { time: 1300 } })];
+    expect(withScheduledGaps(updates, times, "other")).toBe(updates);
   });
 });
