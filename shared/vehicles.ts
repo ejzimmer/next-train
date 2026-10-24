@@ -36,6 +36,7 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
       id,
       tripId,
       route: match.route,
+      destination: data.trips[tripId]?.dest ?? null,
       timestamp,
       direction,
       segment,

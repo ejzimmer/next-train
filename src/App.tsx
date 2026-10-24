@@ -66,6 +66,7 @@ export function App() {
           <LineMap
             line={line}
             vehicles={vehicles.data?.vehicles ?? []}
+            departures={departures.data?.stations}
             closedStretches={(alerts.data?.alerts ?? [])
               .filter((a) => a.stretch && (!a.start || a.start <= now))
               .map((a) => a.stretch!)}
@@ -77,7 +78,6 @@ export function App() {
                 <StationBoard
                   line={line}
                   departures={departures.data?.stations[selected]}
-                  vehicles={vehicles.data?.vehicles ?? []}
                   now={now}
                   onClose={() => select(null)}
                 />

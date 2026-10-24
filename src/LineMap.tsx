@@ -1,5 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
-import type { LineConfig, SchematicStation, VehicleDto } from "../shared/types";
+import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
 import { linePath, pointOnLine } from "./schematic";
 import { useStopped } from "./useStopped";
 
@@ -12,6 +12,8 @@ const BOARD_ROOM = 220;
 interface Props {
   line: LineConfig;
   vehicles: VehicleDto[];
+  /** Live departures by station, used for a train's destination when the timetable data doesn't know its trip. */
+  departures?: Record<string, DepartureDto[]>;
   /** Stretches with no trains right now (buses replacing trains, City Loop closed), drawn dashed. */
   closedStretches: { from: string; to: string }[];
   now: number;
@@ -28,7 +30,7 @@ const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor:
   r: { dx: 14, dy: 5, anchor: "start" },
 };
 
-export function LineMap({ line, vehicles, closedStretches, now, selected, onSelect, board }: Props) {
+export function LineMap({ line, vehicles, departures, closedStretches, now, selected, onSelect, board }: Props) {
   const { width, height } = line.schematic;
   const stations = line.stations;
   const last = stations[stations.length - 1];
@@ -36,6 +38,10 @@ export function LineMap({ line, vehicles, closedStretches, now, selected, onSele
   const scroller = useRef<HTMLDivElement>(null);
   const stopped = useStopped(vehicles);
   const boardPos = sel && boardPosition(sel, width);
+  const placeName = (id: string) => stations.find((s) => s.id === id)?.name ?? id;
+  // The timetable's terminus, else the one in the live departures (for trips added since the data was built).
+  const destinationOf = (v: VehicleDto) =>
+    v.destination ?? Object.values(departures ?? {}).flat().find((d) => d.tripId === v.tripId)?.destination ?? null;
 
   // On narrow screens the map scrolls sideways: bring the selected station into view.
   useEffect(() => {
@@ -102,13 +108,13 @@ export function LineMap({ line, vehicles, closedStretches, now, selected, onSele
                 {v.direction ? <path d={ARROW} /> : <circle r={6} />}
                 <title>
                   {[
-                    `${v.route ?? line.name} train` +
-                      (v.direction === "outbound" ? ` to ${v.route ?? line.name}` : v.direction ? " to the city" : ""),
-                    v.trainType && `${v.cars} car ${v.trainType}`,
+                    v.route && `${v.route} line`,
+                    destinationOf(v) ? `to ${placeName(destinationOf(v)!)}` : v.direction === "citybound" && "to the city",
                     stopped.has(v.id) && "stopped",
                   ]
                     .filter(Boolean)
-                    .join(", ")}
+                    .join(", ")
+                    .replace(/^./, (c) => c.toUpperCase())}
                 </title>
               </g>
             );

@@ -130,7 +130,10 @@ describe("buildVehicles with shared track", () => {
     for (const v of mernda) expect(v.segment).toBeLessThan(10);
     // Mernda trains up near Thomastown are on their own line, not ours.
     expect(res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1166")).toBeUndefined();
-    expect(res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1769")?.direction).toBe("outbound");
+    const mernda1769 = res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1769");
+    expect(mernda1769?.direction).toBe("outbound");
+    // The timetable's terminus, not just the line's far end.
+    expect(mernda1769?.destination).toBe("Mernda");
   });
 
   it("lists a train once when it's reported against two trips", () => {
