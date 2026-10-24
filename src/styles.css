@@ -109,7 +109,7 @@ footer { margin-top: 24px; }
 /* Loading screen: a cartoon X'Trapolis running across. */
 .loading { padding: 48px 0; text-align: center; overflow: hidden; }
 .loading-track { position: relative; height: 66px; margin: 0 -16px; border-bottom: 3px solid var(--muted); overflow: hidden; }
-.xt { position: absolute; bottom: 0; left: 0; animation: xt-run 3.2s linear infinite; }
+.xt { position: absolute; bottom: 0; left: 0; animation: xt-run 5.5s linear infinite; }
 .xt-body { fill: #f2f4f6; stroke: #4d5866; stroke-width: 1; }
 .xt-roof { fill: #b9c1ca; }
 .xt-blue { fill: #1f6fd1; }
@@ -120,7 +120,7 @@ footer { margin-top: 24px; }
 .xt-light { fill: #fffbe0; }
 .xt-wheel circle { fill: #333; }
 .xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
-.xt-wheel { animation: xt-spin 0.4s linear infinite; }
+.xt-wheel { animation: xt-spin 0.7s linear infinite; }
 @keyframes xt-run { from { transform: translateX(-100%); } to { transform: translateX(100vw); } }
 @keyframes xt-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
