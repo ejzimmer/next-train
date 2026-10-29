@@ -6,6 +6,7 @@ import { Disruptions } from "./Disruptions";
 import { LineMap } from "./LineMap";
 import { Loading } from "./Loading";
 import { StationBoard } from "./StationBoard";
+import { useNearestStation } from "./useNearestStation";
 import { useNow, usePoll } from "./usePoll";
 
 const line = hurstbridge as LineConfig;
@@ -15,6 +16,25 @@ const ALERTS_POLL_MS = 2 * 60_000;
 
 function stationFromUrl() {
   return new URLSearchParams(location.search).get("station");
+}
+
+/** Where each station is, for finding the nearest one. */
+const PLACES = stationData.stations as Record<string, { lat: number; lon: number }>;
+const NEAREST_KEY = "showNearest";
+
+function savedShowNearest() {
+  try {
+    return localStorage.getItem(NEAREST_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function showStation(id: string | null) {
+  const url = new URL(location.href);
+  if (id) url.searchParams.set("station", id);
+  else url.searchParams.delete("station");
+  history.replaceState(null, "", url);
 }
 
 export function App() {
@@ -28,13 +48,28 @@ export function App() {
   const select = useCallback((id: string | null) => {
     setSelected((current) => {
       const next = current === id ? null : id;
-      const url = new URL(location.href);
-      if (next) url.searchParams.set("station", next);
-      else url.searchParams.delete("station");
-      history.replaceState(null, "", url);
+      showStation(next);
       return next;
     });
   }, []);
+
+  const [showNearest, setShowNearest] = useState(savedShowNearest);
+  const nearest = useNearestStation(showNearest, PLACES);
+  const nearestId = nearest.status === "found" ? nearest.id : null;
+  const toggleNearest = (on: boolean) => {
+    setShowNearest(on);
+    try {
+      localStorage.setItem(NEAREST_KEY, on ? "1" : "0");
+    } catch {
+      // Not remembered; fine.
+    }
+  };
+  // Open the nearest station's board when it's first found, and again whenever it changes.
+  useEffect(() => {
+    if (!nearestId) return;
+    setSelected(nearestId);
+    showStation(nearestId);
+  }, [nearestId]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && select(null);
@@ -56,6 +91,16 @@ export function App() {
         <p className="muted">
           {vehicles.error ? "Live data unavailable, retrying" : updated ? `Updated ${updated}` : "Loading live data…"}
         </p>
+        <div className="nearest-toggle">
+          <label className="switch">
+            <input type="checkbox" role="switch" checked={showNearest} onChange={(e) => toggleNearest(e.target.checked)} />
+            <span className="switch-track" aria-hidden />
+            Show nearest station
+          </label>
+          <span className="muted" aria-live="polite">
+            {nearestText(nearest, (id) => line.stations.find((s) => s.id === id)?.name ?? id)}
+          </span>
+        </div>
       </header>
       <Disruptions line={line} alerts={alerts.data?.alerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
@@ -72,11 +117,14 @@ export function App() {
               .map((a) => a.stretch!)}
             now={now}
             selected={selected}
+            nearest={nearestId}
             onSelect={select}
             board={
               selected && (
                 <StationBoard
                   line={line}
+                  stationName={line.stations.find((s) => s.id === selected)?.name ?? selected}
+                  nearest={selected === nearestId}
                   departures={departures.data?.stations[selected]}
                   stationIndex={line.stations.findIndex((s) => s.id === selected)}
                   vehicles={vehicles.data?.vehicles ?? []}
@@ -94,4 +142,21 @@ export function App() {
       </footer>
     </div>
   );
+}
+
+function nearestText(nearest: ReturnType<typeof useNearestStation>, name: (id: string) => string) {
+  switch (nearest.status) {
+    case "off":
+      return null;
+    case "locating":
+      return "Finding your location…";
+    case "denied":
+      return "Location is blocked for this site in your browser settings";
+    case "unavailable":
+      return "Couldn't get your location";
+    case "found": {
+      const away = nearest.metres < 1000 ? `${Math.round(nearest.metres / 50) * 50} m` : `${(nearest.metres / 1000).toFixed(1)} km`;
+      return `${name(nearest.id)}, ${away} away`;
+    }
+  }
 }
