@@ -64,14 +64,29 @@ export function Set({ x }: { x: number }) {
 const SET = 3 * CAR + 6;
 const WIDTH = 2 * SET + 4;
 
+/** How wide a train of `cars` cars is drawn. */
+export const trainWidth = (cars: number) =>
+  cars % 3 === 0 ? (cars / 3) * (SET + 4) - 4 : cars * (CAR + 3) - 3;
+
+/** A train of `cars` cars: three-car sets coupled together, or one unit with a driving car at each end. */
+export function Train({ cars }: { cars: number }) {
+  if (cars % 3 === 0) return <>{Array.from({ length: cars / 3 }, (_, i) => <Set key={i} x={i * (SET + 4)} />)}</>;
+  return (
+    <>
+      {Array.from({ length: cars }, (_, i) => (
+        <Car key={i} x={i * (CAR + 3)} cab={i === 0 || i === cars - 1} flip={i === 0} />
+      ))}
+    </>
+  );
+}
+
 /** Shown until the first train positions arrive: a cartoon six-car X'Trapolis running across the screen. */
 export function Loading() {
   return (
     <div className="loading" role="status" aria-label="Loading trains">
       <div className="loading-track">
         <svg className="xt" viewBox={`0 0 ${WIDTH} 58`} width={WIDTH} height={58} aria-hidden>
-          <Set x={0} />
-          <Set x={SET + 4} />
+          <Train cars={6} />
         </svg>
       </div>
       <p className="muted">Finding trains…</p>

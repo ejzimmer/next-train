@@ -20,6 +20,12 @@ function stationFromUrl() {
   return new URLSearchParams(location.search).get("station");
 }
 
+/** How many cars a shared train has (?cars=), for drawing it once its trip has finished. */
+function carsFromUrl() {
+  const cars = Number(new URLSearchParams(location.search).get("cars"));
+  return Number.isInteger(cars) && cars >= 1 && cars <= 9 ? cars : 6;
+}
+
 /** A shared train (?trainid=trip id): opened on its line, boarded. */
 function trainFromUrl() {
   return new URLSearchParams(location.search).get("trainid");
@@ -169,7 +175,7 @@ export function App() {
   };
   const cardVehicle = shownVehicles.find((v) => v.tripId === selectedTrain);
 
-  if (linked === "finished") return <TripFinished />;
+  if (linked === "finished") return <TripFinished cars={carsFromUrl()} />;
 
   return (
     <div className="app">

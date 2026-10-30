@@ -178,10 +178,13 @@ footer { margin-top: 24px; }
 .boarded { fill: none; stroke: var(--fg); stroke-width: 4; }
 .train-card-buttons { display: flex; gap: 8px; margin: 8px 0 2px; }
 .card-button {
-  font: inherit; font-size: 0.9rem; font-weight: 700; padding: 5px 14px; border-radius: 6px; cursor: pointer;
-  border: 2px solid #111; background: #fff; color: #111;
+  font: inherit; font-size: 0.9rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  border: none; background: transparent; color: #111;
 }
 .card-button:hover { background: #e3e6ea; }
+/* Board/Detrain, in the train's line colour. */
+.card-button.primary { background: var(--line); color: #fff; }
+.card-button.primary:hover { filter: brightness(0.9); }
 .card-button:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
 .share { position: relative; display: inline-flex; align-items: center; }
 .copied {
@@ -189,7 +192,7 @@ footer { margin-top: 24px; }
 }
 
 /* "Trip finished": the train parked in a yard. */
-.yard-scene { width: min(760px, 100%); margin: 0 auto; display: block; }
+.yard-scene { max-width: calc(100% - 32px); height: auto; margin: 0 auto; display: block; }
 .yard .xt-wheel { animation: none; }
 .yard-rail { stroke: var(--muted); stroke-width: 3; }
 .yard-sleeper { fill: var(--muted); opacity: 0.5; }

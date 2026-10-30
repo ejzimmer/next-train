@@ -1,30 +1,32 @@
-import { Set as XTrapolis } from "./Loading";
+import { Train, trainWidth } from "./Loading";
 
-const WIDTH = 760;
-/** Ground level of each siding, back to front. */
-const SIDINGS = [70, 110, 150];
-const PARKED = 1;
+/** Track to the left of the train, and room for the buffer stop on the right. */
+const [LEAD, END] = [120, 60];
+/** Ground level of each siding, back to front; the train is on the front one. */
+const SIDINGS = [44, 116];
 
 /** Shown when a shared train link is opened after the train's trip has ended: the train parked in a yard. */
-export function TripFinished() {
+export function TripFinished({ cars }: { cars: number }) {
+  const width = LEAD + trainWidth(cars) + END;
+  const height = SIDINGS[SIDINGS.length - 1] + 10;
   return (
     <div className="loading yard" role="alert">
-      <svg viewBox={`0 0 ${WIDTH} 180`} className="yard-scene" aria-hidden>
+      <svg viewBox={`0 0 ${width} ${height}`} width={width} className="yard-scene" aria-hidden>
         {/* A floodlight tower behind the sidings. */}
-        <line x1={110} x2={110} y1={10} y2={70} className="yard-pole" />
-        <rect x={96} y={4} width={28} height={10} rx={2} className="yard-lamp" />
+        <line x1={50} x2={50} y1={8} y2={SIDINGS[0]} className="yard-pole" />
+        <rect x={36} y={2} width={28} height={10} rx={2} className="yard-lamp" />
         {SIDINGS.map((y, i) => (
           <g key={y}>
-            <line x1={0} x2={WIDTH - 40} y1={y} y2={y} className="yard-rail" />
-            {Array.from({ length: Math.floor((WIDTH - 40) / 24) }, (_, k) => (
-              <rect key={k} x={6 + k * 24} y={y} width={12} height={4} className="yard-sleeper" />
+            {Array.from({ length: Math.floor((width - END + 10) / 20) }, (_, k) => (
+              <rect key={k} x={4 + k * 20} y={y + 1} width={12} height={6} className="yard-sleeper" />
             ))}
+            <line x1={0} x2={width - END + 30} y1={y} y2={y} className="yard-rail" />
             {/* Buffer stop at the end of the siding. */}
-            <path d={`M${WIDTH - 48},${y} V${y - 20} H${WIDTH - 36} V${y}`} className="yard-buffer" />
-            <rect x={WIDTH - 54} y={y - 22} width={8} height={10} className="yard-buffer-beam" />
-            {i === PARKED && (
-              <g transform={`translate(${WIDTH - 56 - (3 * 104 + 6)} ${y - 56})`}>
-                <XTrapolis x={0} />
+            <path d={`M${width - END + 14},${y} L${width - END + 24},${y - 30} L${width - END + 34},${y}`} className="yard-buffer" />
+            <rect x={width - END + 8} y={y - 34} width={14} height={14} rx={2} className="yard-buffer-beam" />
+            {i === SIDINGS.length - 1 && (
+              <g transform={`translate(${LEAD} ${y - 57})`}>
+                <Train cars={cars} />
               </g>
             )}
           </g>
