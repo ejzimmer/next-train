@@ -170,3 +170,31 @@ footer { margin-top: 24px; }
   .xt { animation: none; left: 50%; transform: translateX(-50%); }
   .xt-wheel { animation: none; }
 }
+
+/* A train's card, and the circle round the train the viewer has boarded. */
+.train { cursor: pointer; }
+.train:focus { outline: none; }
+.train-hit { fill: transparent; stroke: none; }
+.boarded { fill: none; stroke: var(--fg); stroke-width: 4; }
+.train-card-buttons { display: flex; gap: 8px; margin: 8px 0 2px; }
+.card-button {
+  font: inherit; font-size: 0.9rem; font-weight: 700; padding: 5px 14px; border-radius: 6px; cursor: pointer;
+  border: 2px solid #111; background: #fff; color: #111;
+}
+.card-button:hover { background: #e3e6ea; }
+.card-button:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
+.share { position: relative; display: inline-flex; align-items: center; }
+.copied {
+  margin-left: 8px; padding: 2px 8px; border-radius: 10px; background: #111; color: #fff; font-size: 0.75rem;
+}
+
+/* "Trip finished": the train parked in a yard. */
+.yard-scene { width: min(760px, 100%); margin: 0 auto; display: block; }
+.yard .xt-wheel { animation: none; }
+.yard-rail { stroke: var(--muted); stroke-width: 3; }
+.yard-sleeper { fill: var(--muted); opacity: 0.5; }
+.yard-buffer { fill: none; stroke: #c0392b; stroke-width: 4; }
+.yard-buffer-beam { fill: #ffd400; }
+.yard-pole { stroke: var(--muted); stroke-width: 4; }
+.yard-lamp { fill: #fffbe0; stroke: var(--muted); stroke-width: 2; }
+.yard-text { font-size: 1.4rem; font-weight: 800; margin: 16px 0 0; }

@@ -4,7 +4,7 @@ const CAR = 104;
  * One cartoon X'Trapolis 100 car in Metro livery. Driving cars (`cab`) have the yellow cab on the right;
  * pass `flip` to put it on the left.
  */
-function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
+export function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
   const body = cab ? "M0,8 H88 Q97,8 99,15 L101,45 Q101,48 98,48 H0 Z" : "M0,8 H104 V48 H0 Z";
   const end = cab ? 88 : CAR;
   return (
@@ -51,7 +51,7 @@ function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
 }
 
 /** A three-car set: a driving car at each end with a trailer between. */
-function Set({ x }: { x: number }) {
+export function Set({ x }: { x: number }) {
   return (
     <>
       <Car x={x} cab flip />
