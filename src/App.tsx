@@ -126,11 +126,12 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, [select]);
 
-  const updated = useMemo(() => {
+  // Only said when the live data is a minute or more old.
+  const stale = useMemo(() => {
     const ts = vehicles.data?.feedTimestamp;
     if (!ts) return null;
-    const secs = Math.max(0, Math.round(now - ts));
-    return secs < 60 ? "just now" : `${Math.round(secs / 60)} min ago`;
+    const secs = Math.round(now - ts);
+    return secs < 60 ? null : `Updated ${Math.round(secs / 60)} min ago`;
   }, [vehicles.data, now]);
 
   return (
@@ -154,7 +155,7 @@ export function App() {
           </button>
         </div>
         <p className="muted">
-          {vehicles.error ? "Live data unavailable, retrying" : updated ? `Updated ${updated}` : "Loading live data…"}
+          {vehicles.error ? "Live data unavailable, retrying" : stale}
         </p>
         <p className="muted" aria-live="polite">
           {nearestText(nearest)}
