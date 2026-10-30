@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LINES, STATIONS } from "../shared/network";
 import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
 import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
@@ -13,6 +13,26 @@ const BOARD_ROOM = 220;
 const MARGIN = 24;
 /** Trains on this line keep the usual colours; trains on other lines are white, as shared-track trains were before. */
 const HOME_LINE = "hurstbridge";
+const FIT_KEY = "fitMap";
+
+function savedFit() {
+  try {
+    return localStorage.getItem(FIT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** The window's size, kept up to date. */
+function useWindowSize() {
+  const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
+  useEffect(() => {
+    const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return size;
+}
 
 interface Props {
   /** The lines switched on. */
@@ -64,7 +84,17 @@ function farthestPair(points: Pt[]): [Pt, Pt] {
   return best;
 }
 
-export function LineMap({ lines, vehicles, departures, closedStretches, now, selected, nearest, onSelect, board }: Props) {
+export function LineMap({
+  lines,
+  vehicles,
+  departures,
+  closedStretches,
+  now,
+  selected,
+  nearest,
+  onSelect,
+  board,
+}: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const stopped = useStopped(vehicles);
   const geometry = useMemo(() => networkGeometry(lines, LINES), [lines]);
@@ -97,7 +127,13 @@ export function LineMap({ lines, vehicles, departures, closedStretches, now, sel
       const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
       const l = LABEL[s.label];
       const edge: Pt =
-        s.label === "t" ? [cx, Math.min(...ys)] : s.label === "b" ? [cx, Math.max(...ys)] : s.label === "l" ? [Math.min(...xs), cy] : [Math.max(...xs), cy];
+        s.label === "t"
+          ? [cx, Math.min(...ys)]
+          : s.label === "b"
+            ? [cx, Math.max(...ys)]
+            : s.label === "l"
+              ? [Math.min(...xs), cy]
+              : [Math.max(...xs), cy];
       s.labelAt = [edge[0] + l.dx + (s.nudge?.[0] ?? 0), edge[1] + l.dy + (s.nudge?.[1] ?? 0)];
     }
     return [...byId.values()];
@@ -122,12 +158,30 @@ export function LineMap({ lines, vehicles, departures, closedStretches, now, sel
     return { x: x0 - MARGIN, y: y0 - MARGIN, width: x1 - x0 + 2 * MARGIN, height: y1 - y0 + 2 * MARGIN };
   }, [stations]);
 
+  // Zoomed out, the whole drawing fits in the window (it's never drawn larger than full size).
+  const [fit, setFit] = useState(savedFit);
+  const win = useWindowSize();
+  const scale = fit && box.width ? Math.min(1, (win.width - 32) / box.width, (win.height - 24) / box.height) : 1;
+  const [width, height] = [box.width * scale, box.height * scale];
+  const toggleFit = () => {
+    setFit(!fit);
+    try {
+      localStorage.setItem(FIT_KEY, fit ? "0" : "1");
+    } catch {
+      // Not remembered; fine.
+    }
+  };
+
   const sel = stations.find((s) => s.id === selected);
-  const selAt = sel && { x: (sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x, y: (sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y };
-  const boardPos = sel && selAt && boardPosition(sel, selAt, box.width);
+  const selAt = sel && {
+    x: ((sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x) * scale,
+    y: ((sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y) * scale,
+  };
+  const boardPos = sel && selAt && boardPosition(sel, selAt, width, scale);
   const placeName = (id: string) => STATIONS[id]?.name ?? id;
   // The timetable's terminus, else the one in the live departures (for trips added since the data was built).
-  const destinationOf = (v: VehicleDto) => v.destination ?? departures?.find((d) => d.tripId === v.tripId)?.destination ?? null;
+  const destinationOf = (v: VehicleDto) =>
+    v.destination ?? departures?.find((d) => d.tripId === v.tripId)?.destination ?? null;
   // A line ends with a bar across it, unless another line switched on carries on through.
   const throughStations = new Set(lines.flatMap((l) => l.stations.slice(1, -1).map((s) => s.id)));
 
@@ -135,125 +189,183 @@ export function LineMap({ lines, vehicles, departures, closedStretches, now, sel
   useEffect(() => {
     const el = scroller.current;
     if (!el || !sel || !selAt) return;
-    const { left } = boardPosition(sel, selAt, box.width);
+    const { left } = boardPosition(sel, selAt, width, scale);
     const from = Math.min(selAt.x, left) - 16;
     const to = Math.max(selAt.x, left + BOARD_WIDTH) + 16;
     if (from < el.scrollLeft || to > el.scrollLeft + el.clientWidth) el.scrollTo({ left: from, behavior: "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, box.width]);
+  }, [selected, width]);
 
   return (
-    <div className="map-scroll" ref={scroller}>
-      <div className="line-map" style={{ width: box.width, height: box.height + BOARD_ROOM }}>
-        <svg
-          width={box.width}
-          height={box.height}
-          viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
-          role="img"
-          aria-label={`${lines.map((l) => l.name).join(", ")} line map`}
-        >
-          <defs>
-            {/* Paints a box behind a station name, for hover and focus. */}
-            <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
-              <feFlood className="label-bg" />
-              <feComposite in="SourceGraphic" operator="over" />
-            </filter>
-          </defs>
-          {lines.map((line) => {
-            const geo = geometry.get(line.id)!;
-            const n = line.stations.length - 1;
-            const main = geo.segments.slice(0, n).flat();
-            return (
-              <g key={line.id} stroke={line.colour} strokeWidth={8} fill="none" strokeLinejoin="round">
-                {geo.segments.slice(n).map((track, i) => (
-                  <path key={i} d={pathOf(track)} strokeLinecap="round" />
-                ))}
-                <path d={pathOf(main)} strokeLinecap="round" />
-                {!throughStations.has(line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
-              </g>
-            );
-          })}
-          {closedStretches.map(({ line: id, from, to }) => {
-            const line = lines.find((l) => l.id === id);
-            const geo = geometry.get(id);
-            if (!line || !geo) return null;
-            const a = line.stations.findIndex((s) => s.id === from);
-            const b = line.stations.findIndex((s) => s.id === to);
-            if (a < 0 || b <= a) return null;
-            return <path key={`${id}-${from}-${to}`} className="bus-stretch" d={pathOf(geo.segments.slice(a, b).flat())} />;
-          })}
-          {stations.map((s) => {
-            const interchange = s.colours.size > 1;
-            const [p, q] = s.ends;
-            const [cx, cy] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-            const half = Math.hypot(p[0] - q[0], p[1] - q[1]) / 2;
-            const colour = interchange ? "var(--fg)" : [...s.colours][0];
-            return (
-              <g
-                key={s.id}
-                className={`station${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
-                onClick={() => onSelect(s.id)}
-                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
-                role="button"
-                tabIndex={0}
-                aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
-                aria-pressed={selected === s.id}
-                style={{ ["--line" as string]: colour }}
-              >
-                <line className="station-hit" x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} strokeWidth={28} strokeLinecap="round" />
-                {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={12 + half} />}
-                {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
-                <line className="station-rim" x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} stroke={colour} strokeWidth={15} strokeLinecap="round" />
-                <line className="station-dot" x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} strokeWidth={9} strokeLinecap="round" />
-                <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
-                  {s.name}
-                </text>
-              </g>
-            );
-          })}
-          {vehicles.map((v) => {
-            const geo = geometry.get(v.line);
-            const age = now - v.timestamp;
-            const pts = geo?.segments[v.segment];
-            if (!pts || age > HIDE_AFTER) return null;
-            const p = pointAlong(pts, v.fraction);
-            const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
-            const dest = destinationOf(v);
-            return (
-              <g
-                key={v.id}
-                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
-                style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
-              >
-                {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
-                {v.direction ? <path d={ARROW} /> : <circle r={6} />}
-                <title>
-                  {[dest ? `to ${placeName(dest)}` : v.direction === "citybound" && "to the city", stopped.has(v.id) && "stopped"]
-                    .filter(Boolean)
-                    .join(", ")
-                    .replace(/^./, (c) => c.toUpperCase())}
-                </title>
-              </g>
-            );
-          })}
-        </svg>
-        {lines.length > 0 && (
-          <Legend
-            home={lines.some((l) => l.id === HOME_LINE)}
-            others={lines.some((l) => l.id !== HOME_LINE)}
-            closed={closedStretches.length > 0}
-            colour={lines[0].colour}
-          />
-        )}
-        {boardPos && (
-          <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
-            {board}
-          </div>
-        )}
+    <>
+      {lines.length > 0 && (
+        <div className="map-tools">
+          <button
+            className="icon-button"
+            onClick={toggleFit}
+            aria-pressed={fit}
+            aria-label={fit ? "Full size" : "Fit map to screen"}
+            title={fit ? "Full size" : "Fit map to screen"}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <path
+                d={fit ? EXPAND : SHRINK}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+      <div className="map-scroll" ref={scroller}>
+        <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
+          <svg
+            width={width}
+            height={height}
+            viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
+            role="img"
+            aria-label={`${lines.map((l) => l.name).join(", ")} line map`}
+          >
+            <defs>
+              {/* Paints a box behind a station name, for hover and focus. */}
+              <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
+                <feFlood className="label-bg" />
+                <feComposite in="SourceGraphic" operator="over" />
+              </filter>
+            </defs>
+            {lines.map((line) => {
+              const geo = geometry.get(line.id)!;
+              const n = line.stations.length - 1;
+              const main = geo.segments.slice(0, n).flat();
+              return (
+                <g key={line.id} stroke={line.colour} strokeWidth={8} fill="none" strokeLinejoin="round">
+                  {geo.segments.slice(n).map((track, i) => (
+                    <path key={i} d={pathOf(track)} strokeLinecap="round" />
+                  ))}
+                  <path d={pathOf(main)} strokeLinecap="round" />
+                  {!throughStations.has(line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
+                </g>
+              );
+            })}
+            {closedStretches.map(({ line: id, from, to }) => {
+              const line = lines.find((l) => l.id === id);
+              const geo = geometry.get(id);
+              if (!line || !geo) return null;
+              const a = line.stations.findIndex((s) => s.id === from);
+              const b = line.stations.findIndex((s) => s.id === to);
+              if (a < 0 || b <= a) return null;
+              return (
+                <path key={`${id}-${from}-${to}`} className="bus-stretch" d={pathOf(geo.segments.slice(a, b).flat())} />
+              );
+            })}
+            {stations.map((s) => {
+              const interchange = s.colours.size > 1;
+              const [p, q] = s.ends;
+              const [cx, cy] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+              const half = Math.hypot(p[0] - q[0], p[1] - q[1]) / 2;
+              const colour = interchange ? "var(--fg)" : [...s.colours][0];
+              return (
+                <g
+                  key={s.id}
+                  className={`station${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
+                  onClick={() => onSelect(s.id)}
+                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
+                  aria-pressed={selected === s.id}
+                  style={{ ["--line" as string]: colour }}
+                >
+                  <line
+                    className="station-hit"
+                    x1={p[0]}
+                    y1={p[1]}
+                    x2={q[0]}
+                    y2={q[1]}
+                    strokeWidth={28}
+                    strokeLinecap="round"
+                  />
+                  {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={12 + half} />}
+                  {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
+                  <line
+                    className="station-rim"
+                    x1={p[0]}
+                    y1={p[1]}
+                    x2={q[0]}
+                    y2={q[1]}
+                    stroke={colour}
+                    strokeWidth={15}
+                    strokeLinecap="round"
+                  />
+                  <line
+                    className="station-dot"
+                    x1={p[0]}
+                    y1={p[1]}
+                    x2={q[0]}
+                    y2={q[1]}
+                    strokeWidth={9}
+                    strokeLinecap="round"
+                  />
+                  <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
+                    {s.name}
+                  </text>
+                </g>
+              );
+            })}
+            {vehicles.map((v) => {
+              const geo = geometry.get(v.line);
+              const age = now - v.timestamp;
+              const pts = geo?.segments[v.segment];
+              if (!pts || age > HIDE_AFTER) return null;
+              const p = pointAlong(pts, v.fraction);
+              const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
+              const dest = destinationOf(v);
+              return (
+                <g
+                  key={v.id}
+                  className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                  style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
+                >
+                  {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
+                  {v.direction ? <path d={ARROW} /> : <circle r={6} />}
+                  <title>
+                    {[
+                      dest ? `to ${placeName(dest)}` : v.direction === "citybound" && "to the city",
+                      stopped.has(v.id) && "stopped",
+                    ]
+                      .filter(Boolean)
+                      .join(", ")
+                      .replace(/^./, (c) => c.toUpperCase())}
+                  </title>
+                </g>
+              );
+            })}
+          </svg>
+          {lines.length > 0 && (
+            <Legend
+              home={lines.some((l) => l.id === HOME_LINE)}
+              others={lines.some((l) => l.id !== HOME_LINE)}
+              closed={closedStretches.length > 0}
+              colour={lines[0].colour}
+            />
+          )}
+          {boardPos && (
+            <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
+              {board}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
+
+/** Arrows pointing in to the middle, and out to the corners. */
+const SHRINK = "M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5";
+const EXPAND = "M9 4H4v5M15 4h5v5M9 20H4v-5M15 20h5v-5";
 
 /** A bar across the end of the line. */
 function EndBar({ points }: { points: Pt[] }) {
@@ -265,8 +377,8 @@ function EndBar({ points }: { points: Pt[] }) {
 }
 
 /** Beside the label when it reads to the right and there's room; otherwise just below the station. */
-function boardPosition(s: MapStation, at: { x: number; y: number }, width: number) {
-  const besideLabel = at.x + 24 + s.name.length * CHAR;
+function boardPosition(s: MapStation, at: { x: number; y: number }, width: number, scale: number) {
+  const besideLabel = at.x + (24 + s.name.length * CHAR) * scale;
   if (s.label === "r" && besideLabel + BOARD_WIDTH <= width) return { left: besideLabel, top: at.y - 22 };
   const below = s.label === "t" || s.label === "b" ? 40 : 20;
   return { left: Math.max(0, Math.min(width - BOARD_WIDTH, at.x - 60)), top: at.y + below };
