@@ -176,7 +176,7 @@ footer { margin-top: 24px; }
 .train:focus { outline: none; }
 .train-hit { fill: transparent; stroke: none; }
 .boarded { fill: none; stroke: var(--fg); stroke-width: 4; }
-.train-card-buttons { display: flex; justify-content: center; gap: 8px; margin: 16px 0 4px; }
+.train-card-buttons { display: flex; justify-content: center; gap: 8px; margin: 28px 0 6px; }
 .card-button {
   font: inherit; font-size: 0.9rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer;
   border: none; background: transparent; color: #111;
