@@ -78,7 +78,7 @@ export function useNearestStation(enabled: boolean, stations: Record<string, Pla
   useEffect(() => {
     if (!enabled || !last.current) return;
     const found = nearest(last.current, stations);
-    if (found) setState({ status: "found", ...found });
+    setState(found ? { status: "found", ...found } : { status: "locating" });
   }, [enabled, stations]);
 
   return state;

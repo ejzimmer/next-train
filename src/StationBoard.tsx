@@ -50,7 +50,7 @@ function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], no
     const [a, b] = [index(from), index(to)].sort((x, y) => x - y);
     return a < stationIndex && stationIndex < b;
   });
-  if (stationIndex <= loopEnd || skipped) return d.time >= now - CITY_GRACE;
+  if (stationIndex >= 0 && (stationIndex <= loopEnd || skipped)) return d.time >= now - CITY_GRACE;
   const at = progress(line, v.segment, v.fraction);
   return d.direction === "outbound" ? at < stationIndex + 0.05 : at > stationIndex - 0.05;
 }

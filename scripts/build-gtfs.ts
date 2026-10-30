@@ -169,7 +169,7 @@ function buildLines(files: Files, stops: Row[], stationOfStop: Map<string, strin
   while (at < text.length) {
     let next = text.indexOf("\n", at);
     if (next < 0) next = text.length;
-    const cols = text.slice(at, next).split(",");
+    const cols = text.slice(at, next).replace(/\r$/, "").split(",");
     at = next + 1;
     const tripId = unquote(cols[ti]);
     const on = tripId && tripLines.get(tripId);

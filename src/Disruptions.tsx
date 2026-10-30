@@ -92,17 +92,21 @@ function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: num
   const byKey = new Map<string, Merged>();
   for (const { alert, lines } of alerts) {
     const { title, sub, after, days } = summary(alert, now);
-    const key = JSON.stringify([title, sub, after, [...days]]);
-    const merged = byKey.get(key);
+    // The same alert on several lines (whatever its times on each), or different alerts that read the same.
+    const keys = [JSON.stringify([alert.id, title, sub]), JSON.stringify([title, sub, after, [...days]])];
+    const merged = keys.map((k) => byKey.get(k)).find(Boolean);
     if (!merged) {
-      byKey.set(key, { id: key, alert, lines: [...lines], descriptions: [alert.description] });
+      const m = { id: keys[0], alert, lines: [...lines], descriptions: [alert.description] };
+      keys.forEach((k) => byKey.set(k, m));
       continue;
     }
+    keys.forEach((k) => byKey.set(k, merged));
     for (const l of lines) if (!merged.lines.includes(l)) merged.lines.push(l);
     if (!merged.descriptions.includes(alert.description)) merged.descriptions.push(alert.description);
   }
-  for (const m of byKey.values()) m.lines.sort((a, b) => LINES.indexOf(a) - LINES.indexOf(b));
-  return [...byKey.values()];
+  const notices = [...new Set(byKey.values())];
+  for (const m of notices) m.lines.sort((a, b) => LINES.indexOf(a) - LINES.indexOf(b));
+  return notices;
 }
 
 function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {

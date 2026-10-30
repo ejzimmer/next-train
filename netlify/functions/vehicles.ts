@@ -29,7 +29,11 @@ function newestPerTrain(vehicles: VehicleDto[]) {
   const start = (v: VehicleDto) => startOf(v.tripId, lines[v.line].data);
   for (const v of vehicles) {
     const kept = byId.get(v.id);
-    if (!kept || kept.timestamp < v.timestamp || (kept.timestamp === v.timestamp && start(kept) < start(v))) byId.set(v.id, v);
+    const newer =
+      !kept ||
+      kept.timestamp < v.timestamp ||
+      (kept.timestamp === v.timestamp && kept.tripId !== v.tripId && start(kept) < start(v));
+    if (newer) byId.set(v.id, v);
   }
   return [...byId.values()];
 }

@@ -24,8 +24,13 @@ export function fetchFeed(mode: string, feed: FeedName, key: string): Promise<Fe
     if (!res.ok) throw new Error(`${feed} returned ${res.status}`);
     return decodeFeed(new Uint8Array(await res.arrayBuffer()));
   })();
-  recent.set(url, { at: Date.now(), feed: fetched });
-  fetched.catch(() => recent.get(url)?.feed === fetched && recent.delete(url));
+  const entry = { at: Date.now(), feed: fetched };
+  recent.set(url, entry);
+  // Fresh from when it arrived; a failure isn't kept.
+  fetched.then(
+    () => (entry.at = Date.now()),
+    () => recent.get(url) === entry && recent.delete(url),
+  );
   return fetched;
 }
 

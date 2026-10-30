@@ -149,7 +149,9 @@ export function LineMap({
   // The scale on screen, and the one asked for, which runs ahead of it while several zoom events
   // arrive before the next render.
   const shownScale = useRef(scale);
-  shownScale.current = scale;
+  useLayoutEffect(() => {
+    shownScale.current = scale;
+  }, [scale]);
   const targetScale = useRef(scale);
   const zoomAnchor = useRef<{ at: Pt; client: Pt } | null>(null);
 
@@ -169,13 +171,17 @@ export function LineMap({
       at: [(clientX - map.left) / shownScale.current, (clientY - map.top) / shownScale.current],
       client: [clientX, clientY],
     };
-    requestAnimationFrame(() => {
+    let frames = 0;
+    const settle = () => {
       const { at, client } = zoomAnchor.current!;
-      zoomAnchor.current = null;
       const moved = el.firstElementChild!.getBoundingClientRect();
-      el.scrollLeft += moved.left + at[0] * targetScale.current - client[0];
-      window.scrollBy(0, moved.top + at[1] * targetScale.current - client[1]);
-    });
+      el.scrollLeft += moved.left + at[0] * shownScale.current - client[0];
+      window.scrollBy(0, moved.top + at[1] * shownScale.current - client[1]);
+      // Until the last size asked for is on screen.
+      if (shownScale.current === targetScale.current || ++frames > 10) zoomAnchor.current = null;
+      else requestAnimationFrame(settle);
+    };
+    requestAnimationFrame(settle);
   }).current;
 
   useEffect(() => {
