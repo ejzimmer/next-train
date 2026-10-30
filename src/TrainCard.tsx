@@ -14,9 +14,7 @@ interface Props {
   onClose: () => void;
 }
 
-/** The car count rides along so a link opened after the trip has ended can still draw the train. */
-export const shareUrl = (v: VehicleDto) =>
-  `https://next-train.ez.codes?trainid=${encodeURIComponent(v.tripId)}${v.cars ? `&cars=${v.cars}` : ""}`;
+export const shareUrl = (tripId: string) => `https://next-train.ez.codes?trainid=${encodeURIComponent(tripId)}`;
 
 function delayText(delay: number) {
   const mins = Math.round(Math.abs(delay) / 60);
@@ -48,7 +46,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
   }, [copied]);
   const share = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl(vehicle));
+      await navigator.clipboard.writeText(shareUrl(vehicle.tripId));
       setCopied(true);
     } catch {
       // No clipboard (e.g. an insecure page); nothing to show.
