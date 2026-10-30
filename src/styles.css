@@ -3,6 +3,7 @@
   --fg: #1a1a1a;
   --muted: #666666;
   --panel: #f4f4f4;
+  --highlight: #e3e6ea;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -13,6 +14,7 @@
     --fg: #f0f0f0;
     --muted: #a0a0a0;
     --panel: #1f1f1f;
+    --highlight: #3a3f46;
   }
 }
 body { margin: 0; background: var(--bg); }
@@ -39,11 +41,12 @@ main { position: relative; }
 .line-map { position: relative; }
 .line-map svg { display: block; overflow: visible; }
 .station { cursor: pointer; }
-.station text { fill: var(--fg); font-size: 13px; transition: fill 0.15s; }
+.station text { fill: var(--fg); font-size: 13px; }
 .station-hit { fill: transparent; }
 .station-dot { fill: var(--bg); transition: fill 0.15s; }
 .station.selected text { font-weight: 700; }
-.station:hover text, .station:focus-visible text { fill: var(--line); text-decoration: underline; }
+.label-bg { flood-color: var(--highlight); }
+.station:hover text, .station:focus-visible text { filter: url(#label-bg); }
 .station:hover .station-dot, .station:focus-visible .station-dot, .station.selected .station-dot { fill: var(--line); }
 .station:focus { outline: none; }
 .station:focus-visible .station-hit { fill: none; stroke: var(--fg); stroke-width: 2; stroke-dasharray: 3 3; }

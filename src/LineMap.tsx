@@ -59,6 +59,13 @@ export function LineMap({ line, vehicles, departures, closedStretches, now, sele
     <div className="map-scroll" ref={scroller}>
       <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
         <svg width={width} height={height} role="img" aria-label={`${line.name} line map`}>
+          <defs>
+            {/* Paints a box behind a station name, for hover and focus. */}
+            <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
+              <feFlood className="label-bg" />
+              <feComposite in="SourceGraphic" operator="over" />
+            </filter>
+          </defs>
           {line.schematic.loopClosure && (
             <polyline points={line.schematic.loopClosure.join(" ")} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" />
           )}
