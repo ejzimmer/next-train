@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LINES, STATIONS } from "../shared/network";
 import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
 import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
@@ -7,6 +7,8 @@ import { useStopped } from "./useStopped";
 const STALE_AFTER = 3 * 60;
 const HIDE_AFTER = 10 * 60;
 const BOARD_WIDTH = 380;
+/** A guess at a board's height until it's been drawn and can be measured. */
+const BOARD_HEIGHT = 300;
 /** Room below the drawing for a board opened on a low station. */
 const BOARD_ROOM = 220;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
@@ -209,12 +211,52 @@ export function LineMap({
     };
   }, [zoomBy]);
 
+  // Points along the drawn lines and labels, which the board tries not to cover.
+  const ink = useMemo(() => {
+    const pts: Pt[] = [];
+    for (const geo of geometry.values())
+      for (const seg of geo.segments)
+        for (let k = 1; k < seg.length; k++) {
+          const [[x0, y0], [x1, y1]] = [seg[k - 1], seg[k]];
+          const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 6);
+          for (let t = 0; t <= steps; t++) pts.push([x0 + ((x1 - x0) * t) / steps, y0 + ((y1 - y0) * t) / steps]);
+        }
+    for (const s of stations) {
+      const [x, y] = s.labelAt;
+      const w = s.name.length * CHAR;
+      const anchor = LABEL[s.label].anchor;
+      const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+      for (let dx = 0; dx <= w; dx += 6) pts.push([left + dx, y - 4]);
+    }
+    return pts;
+  }, [geometry, stations]);
+
+  const anchor = useRef<HTMLDivElement>(null);
+  const [boardHeight, setBoardHeight] = useState(BOARD_HEIGHT);
+  useLayoutEffect(() => {
+    const el = anchor.current;
+    if (!el) return;
+    const measure = () => setBoardHeight(el.offsetHeight || BOARD_HEIGHT);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [selected]);
+
   const sel = stations.find((s) => s.id === selected);
   const selAt = sel && {
     x: ((sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x) * scale,
     y: ((sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y) * scale,
   };
-  const boardPos = sel && selAt && boardPosition(sel, selAt, width, scale);
+  const boardPos =
+    sel &&
+    selAt &&
+    boardPosition(sel, selAt, {
+      width,
+      height: height + BOARD_ROOM,
+      boardHeight,
+      ink: ink.map(([x, y]) => [(x - box.x) * scale, (y - box.y) * scale]),
+    });
   const placeName = (id: string) => STATIONS[id]?.name ?? id;
   // The timetable's terminus, else the one in the live departures (for trips added since the data was built).
   const destinationOf = (v: VehicleDto) =>
@@ -226,7 +268,7 @@ export function LineMap({
   useEffect(() => {
     const el = scroller.current;
     if (!el || !sel || !selAt) return;
-    const { left } = boardPosition(sel, selAt, width, scale);
+    const { left } = boardPos!;
     const from = Math.min(selAt.x, left) - 16;
     const to = Math.max(selAt.x, left + BOARD_WIDTH) + 16;
     if (from < el.scrollLeft || to > el.scrollLeft + el.clientWidth) el.scrollTo({ left: from, behavior: "smooth" });
@@ -367,7 +409,7 @@ export function LineMap({
           />
         )}
         {boardPos && (
-          <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
+          <div className="board-anchor" ref={anchor} style={{ ...boardPos, width: BOARD_WIDTH }}>
             {board}
           </div>
         )}
@@ -385,12 +427,40 @@ function EndBar({ points }: { points: Pt[] }) {
   return <line x1={x1 - nx} y1={y1 - ny} x2={x1 + nx} y2={y1 + ny} strokeWidth={6} />;
 }
 
-/** Beside the label when it reads to the right and there's room; otherwise just below the station. */
-function boardPosition(s: MapStation, at: { x: number; y: number }, width: number, scale: number) {
-  const besideLabel = at.x + (24 + s.name.length * CHAR) * scale;
-  if (s.label === "r" && besideLabel + BOARD_WIDTH <= width) return { left: besideLabel, top: at.y - 22 };
-  const below = s.label === "t" || s.label === "b" ? 40 : 20;
-  return { left: Math.max(0, Math.min(width - BOARD_WIDTH, at.x - 60)), top: at.y + below };
+/**
+ * Where the board goes: whichever of beside, below, above or left of the station covers the least
+ * of the map, never the station itself. Ties go to the earlier spot.
+ */
+function boardPosition(
+  s: MapStation,
+  at: { x: number; y: number },
+  room: { width: number; height: number; boardHeight: number; ink: Pt[] },
+) {
+  const h = room.boardHeight;
+  const labelWidth = s.label === "r" ? s.name.length * CHAR + 10 : 0;
+  const below = s.label === "b" ? 40 : 20;
+  const above = s.label === "t" ? 40 : 20;
+  const spots = [
+    { left: at.x + 14 + labelWidth, top: at.y - 22 },
+    { left: at.x - 60, top: at.y + below },
+    { left: at.x - 60, top: at.y - above - h },
+    { left: at.x - 24 - BOARD_WIDTH, top: at.y - 22 },
+    { left: at.x + 24, top: at.y + below },
+    { left: at.x - BOARD_WIDTH + 24, top: at.y + below },
+  ].map(({ left, top }) => ({
+    left: Math.max(0, Math.min(room.width - BOARD_WIDTH, left)),
+    top: Math.max(0, Math.min(room.height - h, top)),
+  }));
+  const inside = (p: { left: number; top: number }, x: number, y: number, pad = 0) =>
+    x >= p.left - pad && x <= p.left + BOARD_WIDTH + pad && y >= p.top - pad && y <= p.top + h + pad;
+  let best = spots[1];
+  let fewest = Infinity;
+  for (const spot of spots) {
+    if (inside(spot, at.x, at.y, 12)) continue;
+    const covered = room.ink.filter(([x, y]) => inside(spot, x, y)).length;
+    if (covered < fewest) [best, fewest] = [spot, covered];
+  }
+  return best;
 }
 
 const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
