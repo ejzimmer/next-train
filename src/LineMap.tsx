@@ -11,18 +11,9 @@ const BOARD_WIDTH = 380;
 const BOARD_ROOM = 220;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
 const MARGIN = 24;
+const MAX_ZOOM = 2;
 /** Trains on this line keep the usual colours; trains on other lines are white, as shared-track trains were before. */
 const HOME_LINE = "hurstbridge";
-const FIT_KEY = "fitMap";
-
-function savedFit() {
-  try {
-    return localStorage.getItem(FIT_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
 /** The window's size, kept up to date. */
 function useWindowSize() {
   const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
@@ -158,19 +149,81 @@ export function LineMap({
     return { x: x0 - MARGIN, y: y0 - MARGIN, width: x1 - x0 + 2 * MARGIN, height: y1 - y0 + 2 * MARGIN };
   }, [stations]);
 
-  // Zoomed out, the whole drawing fits in the window (it's never drawn larger than full size).
-  const [fit, setFit] = useState(savedFit);
+  // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom, from small enough to fit the window to double size.
+  const [zoom, setZoom] = useState(1);
   const win = useWindowSize();
-  const scale = fit && box.width ? Math.min(1, (win.width - 32) / box.width, (win.height - 24) / box.height) : 1;
+  const minScale = box.width ? Math.min(1, (win.width - 32) / box.width, (win.height - 24) / box.height) : 1;
+  const scale = Math.min(MAX_ZOOM, Math.max(minScale, zoom));
   const [width, height] = [box.width * scale, box.height * scale];
-  const toggleFit = () => {
-    setFit(!fit);
-    try {
-      localStorage.setItem(FIT_KEY, fit ? "0" : "1");
-    } catch {
-      // Not remembered; fine.
-    }
-  };
+  // The latest scale, for the event handlers below.
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  const limitsRef = useRef([minScale, MAX_ZOOM]);
+  limitsRef.current = [minScale, MAX_ZOOM];
+
+  /** Zooms by `factor`, keeping the point at (clientX, clientY) where it is on screen. */
+  const zoomBy = useRef((factor: number, clientX: number, clientY: number) => {
+    const el = scroller.current;
+    if (!el) return;
+    const [lo, hi] = limitsRef.current;
+    const from = scaleRef.current;
+    const to = Math.min(hi, Math.max(lo, from * factor));
+    if (to === from) return;
+    const map = el.firstElementChild!.getBoundingClientRect();
+    const [x, y] = [clientX - map.left, clientY - map.top];
+    setZoom(to);
+    requestAnimationFrame(() => {
+      const moved = el.firstElementChild!.getBoundingClientRect();
+      el.scrollLeft += moved.left + (x * to) / from - clientX;
+      window.scrollBy(0, moved.top + (y * to) / from - clientY);
+    });
+  }).current;
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      zoomBy(Math.exp(-e.deltaY / 300), e.clientX, e.clientY);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).closest?.("input, textarea")) return;
+      const factor = e.key === "+" || e.key === "=" ? 1.25 : e.key === "-" || e.key === "_" ? 0.8 : null;
+      if (!factor) return;
+      const r = el.getBoundingClientRect();
+      zoomBy(factor, r.left + el.clientWidth / 2, Math.max(r.top, 0) + Math.min(r.height, window.innerHeight) / 2);
+    };
+    // A two-finger pinch on the map zooms the map rather than the page.
+    let pinch: number | null = null;
+    const spread = (t: TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 2) {
+        pinch = null;
+        return;
+      }
+      e.preventDefault();
+      const d = spread(e.touches);
+      if (pinch)
+        zoomBy(
+          d / pinch,
+          (e.touches[0].clientX + e.touches[1].clientX) / 2,
+          (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        );
+      pinch = d;
+    };
+    const onTouchEnd = () => (pinch = null);
+    el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [zoomBy]);
 
   const sel = stations.find((s) => s.id === selected);
   const selAt = sel && {
@@ -194,178 +247,150 @@ export function LineMap({
     const to = Math.max(selAt.x, left + BOARD_WIDTH) + 16;
     if (from < el.scrollLeft || to > el.scrollLeft + el.clientWidth) el.scrollTo({ left: from, behavior: "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, width]);
+  }, [selected, box.width]);
 
   return (
-    <>
-      {lines.length > 0 && (
-        <div className="map-tools">
-          <button
-            className="icon-button"
-            onClick={toggleFit}
-            aria-pressed={fit}
-            aria-label={fit ? "Full size" : "Fit map to screen"}
-            title={fit ? "Full size" : "Fit map to screen"}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden>
-              <path
-                d={fit ? ZOOM_IN : ZOOM_OUT}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={2}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        </div>
-      )}
-      <div className="map-scroll" ref={scroller}>
-        <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
-          <svg
-            width={width}
-            height={height}
-            viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
-            role="img"
-            aria-label={`${lines.map((l) => l.name).join(", ")} line map`}
-          >
-            <defs>
-              {/* Paints a box behind a station name, for hover and focus. */}
-              <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
-                <feFlood className="label-bg" />
-                <feComposite in="SourceGraphic" operator="over" />
-              </filter>
-            </defs>
-            {lines.map((line) => {
-              const geo = geometry.get(line.id)!;
-              const n = line.stations.length - 1;
-              const main = geo.segments.slice(0, n).flat();
-              return (
-                <g key={line.id} stroke={line.colour} strokeWidth={8} fill="none" strokeLinejoin="round">
-                  {geo.segments.slice(n).map((track, i) => (
-                    <path key={i} d={pathOf(track)} strokeLinecap="round" />
-                  ))}
-                  <path d={pathOf(main)} strokeLinecap="round" />
-                  {!throughStations.has(line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
-                </g>
-              );
-            })}
-            {closedStretches.map(({ line: id, from, to }) => {
-              const line = lines.find((l) => l.id === id);
-              const geo = geometry.get(id);
-              if (!line || !geo) return null;
-              const a = line.stations.findIndex((s) => s.id === from);
-              const b = line.stations.findIndex((s) => s.id === to);
-              if (a < 0 || b <= a) return null;
-              return (
-                <path key={`${id}-${from}-${to}`} className="bus-stretch" d={pathOf(geo.segments.slice(a, b).flat())} />
-              );
-            })}
-            {stations.map((s) => {
-              const interchange = s.colours.size > 1;
-              const [p, q] = s.ends;
-              const [cx, cy] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
-              const half = Math.hypot(p[0] - q[0], p[1] - q[1]) / 2;
-              const colour = interchange ? "var(--fg)" : [...s.colours][0];
-              return (
-                <g
-                  key={s.id}
-                  className={`station${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
-                  onClick={() => onSelect(s.id)}
-                  onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
-                  aria-pressed={selected === s.id}
-                  style={{ ["--line" as string]: colour }}
-                >
-                  <line
-                    className="station-hit"
-                    x1={p[0]}
-                    y1={p[1]}
-                    x2={q[0]}
-                    y2={q[1]}
-                    strokeWidth={28}
-                    strokeLinecap="round"
-                  />
-                  {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={12 + half} />}
-                  {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
-                  <line
-                    className="station-rim"
-                    x1={p[0]}
-                    y1={p[1]}
-                    x2={q[0]}
-                    y2={q[1]}
-                    stroke={colour}
-                    strokeWidth={15}
-                    strokeLinecap="round"
-                  />
-                  <line
-                    className="station-dot"
-                    x1={p[0]}
-                    y1={p[1]}
-                    x2={q[0]}
-                    y2={q[1]}
-                    strokeWidth={9}
-                    strokeLinecap="round"
-                  />
-                  <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
-                    {s.name}
-                  </text>
-                </g>
-              );
-            })}
-            {vehicles.map((v) => {
-              const geo = geometry.get(v.line);
-              const age = now - v.timestamp;
-              const pts = geo?.segments[v.segment];
-              if (!pts || age > HIDE_AFTER) return null;
-              const p = pointAlong(pts, v.fraction);
-              const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
-              const dest = destinationOf(v);
-              return (
-                <g
-                  key={v.id}
-                  className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
-                  style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
-                >
-                  {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
-                  {v.direction ? <path d={ARROW} /> : <circle r={6} />}
-                  <title>
-                    {[
-                      dest ? `to ${placeName(dest)}` : v.direction === "citybound" && "to the city",
-                      stopped.has(v.id) && "stopped",
-                    ]
-                      .filter(Boolean)
-                      .join(", ")
-                      .replace(/^./, (c) => c.toUpperCase())}
-                  </title>
-                </g>
-              );
-            })}
-          </svg>
-          {lines.length > 0 && (
-            <Legend
-              home={lines.some((l) => l.id === HOME_LINE)}
-              others={lines.some((l) => l.id !== HOME_LINE)}
-              closed={closedStretches.length > 0}
-              colour={lines[0].colour}
-            />
-          )}
-          {boardPos && (
-            <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
-              {board}
-            </div>
-          )}
-        </div>
+    <div className="map-scroll" ref={scroller}>
+      <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
+        <svg
+          width={width}
+          height={height}
+          viewBox={`${box.x} ${box.y} ${box.width} ${box.height}`}
+          role="img"
+          aria-label={`${lines.map((l) => l.name).join(", ")} line map`}
+        >
+          <defs>
+            {/* Paints a box behind a station name, for hover and focus. */}
+            <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
+              <feFlood className="label-bg" />
+              <feComposite in="SourceGraphic" operator="over" />
+            </filter>
+          </defs>
+          {lines.map((line) => {
+            const geo = geometry.get(line.id)!;
+            const n = line.stations.length - 1;
+            const main = geo.segments.slice(0, n).flat();
+            return (
+              <g key={line.id} stroke={line.colour} strokeWidth={8} fill="none" strokeLinejoin="round">
+                {geo.segments.slice(n).map((track, i) => (
+                  <path key={i} d={pathOf(track)} strokeLinecap="round" />
+                ))}
+                <path d={pathOf(main)} strokeLinecap="round" />
+                {!throughStations.has(line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
+              </g>
+            );
+          })}
+          {closedStretches.map(({ line: id, from, to }) => {
+            const line = lines.find((l) => l.id === id);
+            const geo = geometry.get(id);
+            if (!line || !geo) return null;
+            const a = line.stations.findIndex((s) => s.id === from);
+            const b = line.stations.findIndex((s) => s.id === to);
+            if (a < 0 || b <= a) return null;
+            return (
+              <path key={`${id}-${from}-${to}`} className="bus-stretch" d={pathOf(geo.segments.slice(a, b).flat())} />
+            );
+          })}
+          {stations.map((s) => {
+            const interchange = s.colours.size > 1;
+            const [p, q] = s.ends;
+            const [cx, cy] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+            const half = Math.hypot(p[0] - q[0], p[1] - q[1]) / 2;
+            const colour = interchange ? "var(--fg)" : [...s.colours][0];
+            return (
+              <g
+                key={s.id}
+                className={`station${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
+                onClick={() => onSelect(s.id)}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
+                aria-pressed={selected === s.id}
+                style={{ ["--line" as string]: colour }}
+              >
+                <line
+                  className="station-hit"
+                  x1={p[0]}
+                  y1={p[1]}
+                  x2={q[0]}
+                  y2={q[1]}
+                  strokeWidth={28}
+                  strokeLinecap="round"
+                />
+                {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={12 + half} />}
+                {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
+                <line
+                  className="station-rim"
+                  x1={p[0]}
+                  y1={p[1]}
+                  x2={q[0]}
+                  y2={q[1]}
+                  stroke={colour}
+                  strokeWidth={15}
+                  strokeLinecap="round"
+                />
+                <line
+                  className="station-dot"
+                  x1={p[0]}
+                  y1={p[1]}
+                  x2={q[0]}
+                  y2={q[1]}
+                  strokeWidth={9}
+                  strokeLinecap="round"
+                />
+                <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
+                  {s.name}
+                </text>
+              </g>
+            );
+          })}
+          {vehicles.map((v) => {
+            const geo = geometry.get(v.line);
+            const age = now - v.timestamp;
+            const pts = geo?.segments[v.segment];
+            if (!pts || age > HIDE_AFTER) return null;
+            const p = pointAlong(pts, v.fraction);
+            const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
+            const dest = destinationOf(v);
+            return (
+              <g
+                key={v.id}
+                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
+              >
+                {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
+                {v.direction ? <path d={ARROW} /> : <circle r={6} />}
+                <title>
+                  {[
+                    dest ? `to ${placeName(dest)}` : v.direction === "citybound" && "to the city",
+                    stopped.has(v.id) && "stopped",
+                  ]
+                    .filter(Boolean)
+                    .join(", ")
+                    .replace(/^./, (c) => c.toUpperCase())}
+                </title>
+              </g>
+            );
+          })}
+        </svg>
+        {lines.length > 0 && (
+          <Legend
+            home={lines.some((l) => l.id === HOME_LINE)}
+            others={lines.some((l) => l.id !== HOME_LINE)}
+            closed={closedStretches.length > 0}
+            colour={lines[0].colour}
+          />
+        )}
+        {boardPos && (
+          <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
+            {board}
+          </div>
+        )}
       </div>
-    </>
+    </div>
   );
 }
-
-/** A magnifying glass with a minus (zoom out to fit) or a plus (back to full size). */
-const ZOOM_OUT = "M10 3a7 7 0 1 0 0 14a7 7 0 1 0 0-14M15 15l6 6M7 10h6";
-const ZOOM_IN = `${ZOOM_OUT}M10 7v6`;
 
 /** A bar across the end of the line. */
 function EndBar({ points }: { points: Pt[] }) {
