@@ -442,8 +442,9 @@ function station(name: string): SchematicStation {
   return { ...s };
 }
 
-/** Stations whose departures show a platform number. */
-const PLATFORM_STATIONS = ["flinders-street", "southern-cross"];
+/** Departures show a platform number at stations on more than one line. */
+const lineCount = new Map<string, number>();
+for (const def of LINE_DEFS) for (const name of def.stations) lineCount.set(stationId(name), (lineCount.get(stationId(name)) ?? 0) + 1);
 
 export const LINES: LineConfig[] = LINE_DEFS.map((def) => {
   const stations = def.stations.map(station);
@@ -460,7 +461,7 @@ export const LINES: LineConfig[] = LINE_DEFS.map((def) => {
     group: def.group,
     routeIdMatch: `-${def.code}:`,
     cityLoop: def.cityLoop && [stationId(def.cityLoop[0]), stationId(def.cityLoop[1])],
-    platformStations: PLATFORM_STATIONS.filter((id) => stations.some((s) => s.id === id)),
+    platformStations: stations.filter((s) => lineCount.get(s.id)! > 1).map((s) => s.id),
     stations,
     track: (def.track ?? []).map(([from, to]) => ({
       from: stationId(from),

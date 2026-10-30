@@ -114,6 +114,8 @@ footer { margin-top: 24px; }
 .disruptions-body { padding: 4px 26px 10px 16px; }
 .notice { padding: 10px 0; border-bottom: 2px solid #4a90d9; }
 .notice:last-of-type { border-bottom: none; }
+.notice-lines { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 6px; }
+.notice-lines li { font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 10px; }
 .notice h2 { margin: 0; font-size: 1.5rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.01em; }
 .notice-after { font-size: 1.1rem; font-weight: 700; }
 .notice-sub { margin: 2px 0 8px; font-weight: 600; }

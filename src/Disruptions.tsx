@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { STATIONS } from "../shared/network";
-import type { AlertDto } from "../shared/types";
+import type { AlertDto, LineConfig } from "../shared/types";
 import { calendarWeeks, disruptedDays } from "./calendar";
 
 interface Props {
-  alerts: AlertDto[] | undefined;
+  /** Each alert with the lines it's on. */
+  alerts: { alert: AlertDto; lines: LineConfig[] }[] | undefined;
   now: number;
 }
 
@@ -65,7 +66,7 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
   );
 }
 
-function Notice({ alert, now }: { alert: AlertDto; now: number }) {
+function Notice({ alert, lines, now }: { alert: AlertDto; lines: LineConfig[]; now: number }) {
   const name = (id: string) => STATIONS[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
@@ -76,6 +77,13 @@ function Notice({ alert, now }: { alert: AlertDto; now: number }) {
   const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
   return (
     <section className={`notice${live ? " live" : ""}`}>
+      <ul className="notice-lines">
+        {lines.map((l) => (
+          <li key={l.id} style={{ background: l.colour, color: l.textColour }}>
+            {l.name}
+          </li>
+        ))}
+      </ul>
       <h2>
         {title}
         {!sub && after && <span className="notice-after"> {after}</span>}
@@ -122,7 +130,7 @@ export function Disruptions({ alerts, now }: Props) {
       // Not remembered; fine.
     }
   };
-  const hasNight = alerts.some((a) => [...disruptedDays(a.periods, now).values()].includes("night"));
+  const hasNight = alerts.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
   return (
     <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
       <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">
@@ -134,8 +142,8 @@ export function Disruptions({ alerts, now }: Props) {
         </svg>
       </button>
       <div className="disruptions-body" hidden={collapsed}>
-        {alerts.map((a) => (
-          <Notice key={a.id} alert={a} now={now} />
+        {alerts.map(({ alert, lines }) => (
+          <Notice key={alert.id} alert={alert} lines={lines} now={now} />
         ))}
         <ul className="cal-key">
           <li>
