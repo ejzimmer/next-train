@@ -136,20 +136,29 @@ export function App() {
   return (
     <div className="app">
       <header className="top">
-        <h1>{lines.length === 1 ? `${lines[0].name} line` : "Metro trains"}</h1>
+        <div className="title-row">
+          <h1>{lines.length === 1 ? `${lines[0].name} line` : "Metro trains"}</h1>
+          <button
+            className="icon-button locate"
+            aria-pressed={showNearest}
+            onClick={() => toggleNearest(!showNearest)}
+            aria-label="Show nearest station"
+            title="Show nearest station"
+          >
+            {/* A crosshair. */}
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <circle cx={12} cy={12} r={7} fill="none" stroke="currentColor" strokeWidth={2} />
+              <circle cx={12} cy={12} r={2.5} fill="currentColor" />
+              <path d="M12 1v4M12 19v4M1 12h4M19 12h4" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
         <p className="muted">
           {vehicles.error ? "Live data unavailable, retrying" : updated ? `Updated ${updated}` : "Loading live data…"}
         </p>
-        <div className="nearest-toggle">
-          <label className="switch">
-            <input type="checkbox" role="switch" checked={showNearest} onChange={(e) => toggleNearest(e.target.checked)} />
-            <span className="switch-track" aria-hidden />
-            Show nearest station
-          </label>
-          <span className="muted" aria-live="polite">
-            {nearestText(nearest)}
-          </span>
-        </div>
+        <p className="muted" aria-live="polite">
+          {nearestText(nearest)}
+        </p>
         <LineSwitches on={lineIds} onToggle={toggleLine} />
       </header>
       <Disruptions alerts={shownAlerts} now={now} />
