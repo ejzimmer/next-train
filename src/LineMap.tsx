@@ -9,8 +9,10 @@ const HIDE_AFTER = 10 * 60;
 const BOARD_WIDTH = 380;
 /** A guess at a board's height until it's been drawn and can be measured. */
 const BOARD_HEIGHT = 300;
-/** Room below the drawing for a board opened on a low station. */
-const BOARD_ROOM = 220;
+/** Room below the drawing for the legend. */
+const LEGEND_ROOM = 60;
+/** Size of the cells the board's spot is searched in. */
+const CELL = 16;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
 const MARGIN = 24;
 const [MIN_ZOOM, MAX_ZOOM] = [0.2, 3];
@@ -226,7 +228,7 @@ export function LineMap({
       const w = s.name.length * CHAR;
       const anchor = LABEL[s.label].anchor;
       const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
-      for (let dx = 0; dx <= w; dx += 6) pts.push([left + dx, y - 4]);
+      for (let dx = 0; dx <= w; dx += 6) for (const dy of [-12, -4, 4]) pts.push([left + dx, y + dy]);
     }
     return pts;
   }, [geometry, stations]);
@@ -243,20 +245,39 @@ export function LineMap({
     return () => observer.disconnect();
   }, [selected]);
 
+  // Room either side of the map when it's narrower than the window; the board can sit there too.
+  const [side, setSide] = useState(0);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const measure = () => {
+      const pad = parseFloat(getComputedStyle(el).paddingLeft) || 0;
+      setSide(Math.max(0, (el.clientWidth - 2 * pad - width) / 2));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [width]);
+
   const sel = stations.find((s) => s.id === selected);
   const selAt = sel && {
     x: ((sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x) * scale,
     y: ((sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y) * scale,
   };
-  const boardPos =
-    sel &&
-    selAt &&
-    boardPosition(sel, selAt, {
-      width,
-      height: height + BOARD_ROOM,
-      boardHeight,
-      ink: ink.map(([x, y]) => [(x - box.x) * scale, (y - box.y) * scale]),
-    });
+  const boardPos = useMemo(
+    () =>
+      selAt &&
+      boardPosition(selAt, {
+        left: -side,
+        right: width + side,
+        height,
+        boardHeight,
+        ink: ink.map(([x, y]) => [(x - box.x) * scale, (y - box.y) * scale]),
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selAt?.x, selAt?.y, side, width, height, boardHeight, ink, box, scale],
+  );
   const placeName = (id: string) => STATIONS[id]?.name ?? id;
   // The timetable's terminus, else the one in the live departures (for trips added since the data was built).
   const destinationOf = (v: VehicleDto) =>
@@ -277,7 +298,10 @@ export function LineMap({
 
   return (
     <div className="map-scroll" ref={scroller}>
-      <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
+      <div
+        className="line-map"
+        style={{ width, height: Math.max(height + LEGEND_ROOM, boardPos ? boardPos.top + boardHeight + 16 : 0) }}
+      >
         <svg
           width={width}
           height={height}
@@ -428,38 +452,48 @@ function EndBar({ points }: { points: Pt[] }) {
 }
 
 /**
- * Where the board goes: whichever of beside, below, above or left of the station covers the least
- * of the map, never the station itself. Ties go to the earlier spot.
+ * Where the board goes: the spot nearest the station that covers the least of the lines, names and
+ * legend, anywhere between `left` and `right` (which may be outside the map) and below the top of the
+ * map. It never covers the station itself.
  */
 function boardPosition(
-  s: MapStation,
   at: { x: number; y: number },
-  room: { width: number; height: number; boardHeight: number; ink: Pt[] },
+  room: { left: number; right: number; height: number; boardHeight: number; ink: Pt[] },
 ) {
   const h = room.boardHeight;
-  const labelWidth = s.label === "r" ? s.name.length * CHAR + 10 : 0;
-  const below = s.label === "b" ? 40 : 20;
-  const above = s.label === "t" ? 40 : 20;
-  const spots = [
-    { left: at.x + 14 + labelWidth, top: at.y - 22 },
-    { left: at.x - 60, top: at.y + below },
-    { left: at.x - 60, top: at.y - above - h },
-    { left: at.x - 24 - BOARD_WIDTH, top: at.y - 22 },
-    { left: at.x + 24, top: at.y + below },
-    { left: at.x - BOARD_WIDTH + 24, top: at.y + below },
-  ].map(({ left, top }) => ({
-    left: Math.max(0, Math.min(room.width - BOARD_WIDTH, left)),
-    top: Math.max(0, Math.min(room.height - h, top)),
-  }));
-  const inside = (p: { left: number; top: number }, x: number, y: number, pad = 0) =>
-    x >= p.left - pad && x <= p.left + BOARD_WIDTH + pad && y >= p.top - pad && y <= p.top + h + pad;
-  let best = spots[1];
-  let fewest = Infinity;
-  for (const spot of spots) {
-    if (inside(spot, at.x, at.y, 12)) continue;
-    const covered = room.ink.filter(([x, y]) => inside(spot, x, y)).length;
-    if (covered < fewest) [best, fewest] = [spot, covered];
-  }
+  const cols = Math.max(1, Math.ceil((room.right - room.left) / CELL));
+  const rows = Math.ceil((room.height + LEGEND_ROOM + h) / CELL) + 1;
+  // How much is drawn in each cell, then summed so any rectangle of cells can be totalled at once.
+  const sum = new Float64Array((cols + 1) * (rows + 1));
+  const add = (x: number, y: number, n = 1) => {
+    const c = Math.floor((x - room.left) / CELL);
+    const r = Math.floor(y / CELL);
+    if (c >= 0 && c < cols && r >= 0 && r < rows) sum[(r + 1) * (cols + 1) + c + 1] += n;
+  };
+  for (const [x, y] of room.ink) add(x, y);
+  // The legend, below the map.
+  for (let x = 0; x < room.right + room.left; x += CELL)
+    for (let y = room.height; y < room.height + LEGEND_ROOM; y += CELL) add(x, y, 4);
+  for (let r = 1; r <= rows; r++)
+    for (let c = 1; c <= cols; c++)
+      sum[r * (cols + 1) + c] += sum[(r - 1) * (cols + 1) + c] + sum[r * (cols + 1) + c - 1] - sum[(r - 1) * (cols + 1) + c - 1];
+  const total = (c0: number, r0: number, c1: number, r1: number) =>
+    sum[r1 * (cols + 1) + c1] - sum[r0 * (cols + 1) + c1] - sum[r1 * (cols + 1) + c0] + sum[r0 * (cols + 1) + c0];
+
+  const [wide, tall] = [Math.ceil(BOARD_WIDTH / CELL), Math.ceil(h / CELL)];
+  let best = { left: Math.max(room.left, Math.min(room.right - BOARD_WIDTH, at.x - 60)), top: at.y + 20 };
+  let cost = Infinity;
+  for (let r = 0; r + tall <= rows; r++)
+    for (let c = 0; c + wide <= Math.max(wide, cols); c++) {
+      const left = room.left + c * CELL;
+      const top = r * CELL;
+      const dx = Math.max(left - at.x, 0, at.x - (left + BOARD_WIDTH));
+      const dy = Math.max(top - at.y, 0, at.y - (top + h));
+      if (dx < 16 && dy < 16) continue;
+      const covered = total(c, r, Math.min(cols, c + wide), r + tall);
+      const here = covered * 1000 + Math.hypot(dx, dy);
+      if (here < cost) [best, cost] = [{ left, top }, here];
+    }
   return best;
 }
 
