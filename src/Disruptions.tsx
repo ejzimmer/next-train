@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { STATIONS } from "../shared/network";
+import { LINES, STATIONS } from "../shared/network";
 import type { AlertDto, LineConfig } from "../shared/types";
 import { calendarWeeks, disruptedDays } from "./calendar";
 
@@ -66,15 +66,46 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
   );
 }
 
-function Notice({ alert, lines, now }: { alert: AlertDto; lines: LineConfig[]; now: number }) {
+/** What a notice shows above its details. */
+function summary(alert: AlertDto, now: number) {
   const name = (id: string) => STATIONS[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
-  const live = !alert.start || alert.start <= now;
   // When the trains stop each night, from the same periods the calendar uses.
   const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
   const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
+  return { title, sub, after, days };
+}
+
+interface Merged {
+  alert: AlertDto;
+  lines: LineConfig[];
+  /** Every different description among the alerts merged into this notice. */
+  descriptions: string[];
+}
+
+/** Alerts that would show the same notice (e.g. each line's "No City Loop" for the same nights) become one. */
+function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: number): Merged[] {
+  const byKey = new Map<string, Merged>();
+  for (const { alert, lines } of alerts) {
+    const { title, sub, after, days } = summary(alert, now);
+    const key = JSON.stringify([title, sub, after, [...days]]);
+    const merged = byKey.get(key);
+    if (!merged) {
+      byKey.set(key, { alert, lines: [...lines], descriptions: [alert.description] });
+      continue;
+    }
+    for (const l of lines) if (!merged.lines.includes(l)) merged.lines.push(l);
+    if (!merged.descriptions.includes(alert.description)) merged.descriptions.push(alert.description);
+  }
+  for (const m of byKey.values()) m.lines.sort((a, b) => LINES.indexOf(a) - LINES.indexOf(b));
+  return [...byKey.values()];
+}
+
+function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
+  const { title, sub, after } = summary(alert, now);
+  const live = !alert.start || alert.start <= now;
   return (
     <section className={`notice${live ? " live" : ""}`}>
       <ul className="notice-lines">
@@ -97,7 +128,9 @@ function Notice({ alert, lines, now }: { alert: AlertDto; lines: LineConfig[]; n
       <Calendar alert={alert} now={now} />
       <details>
         <summary>Details</summary>
-        <p>{alert.description}</p>
+        {descriptions.map((d) => (
+          <p key={d}>{d}</p>
+        ))}
         {alert.url && (
           <p>
             <a href={alert.url} target="_blank" rel="noreferrer">
@@ -130,7 +163,8 @@ export function Disruptions({ alerts, now }: Props) {
       // Not remembered; fine.
     }
   };
-  const hasNight = alerts.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
+  const notices = mergeAlike(alerts, now);
+  const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
   return (
     <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
       <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">
@@ -142,8 +176,8 @@ export function Disruptions({ alerts, now }: Props) {
         </svg>
       </button>
       <div className="disruptions-body" hidden={collapsed}>
-        {alerts.map(({ alert, lines }) => (
-          <Notice key={alert.id} alert={alert} lines={lines} now={now} />
+        {notices.map((n) => (
+          <Notice key={n.alert.id} {...n} now={now} />
         ))}
         <ul className="cal-key">
           <li>
