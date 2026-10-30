@@ -74,11 +74,7 @@ main { position: relative; }
 .pid-mins { background: #000; color: #fff; padding: 2px 8px; min-width: 4em; text-align: center; white-space: nowrap; }
 .pid-row.cancelled .pid-time, .pid-row.cancelled .pid-dest { text-decoration: line-through; color: #888; }
 .pid-empty { margin: 6px 0; font-size: 0.9rem; }
-.pid-station {
-  display: flex; align-items: baseline; gap: 10px; margin: 0 0 4px; padding: 2px 16px 6px 0;
-  font-size: 1.15rem; font-weight: 800; border-bottom: 2px solid #222;
-}
-.pid-nearest { font-size: 0.75rem; font-weight: 600; color: #0057a8; }
+.pid-station { margin: 0 0 2px; padding: 2px 16px 2px 0; font-size: 1.15rem; font-weight: 800; }
 .pid-close {
   position: absolute; top: -16px; right: -12px; width: 26px; height: 26px; border-radius: 50%;
   border: none; background: #222; color: #fff; font-size: 16px; line-height: 1; cursor: pointer;

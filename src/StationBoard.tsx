@@ -3,8 +3,6 @@ import type { DepartureDto, LineConfig, VehicleDto } from "../shared/types";
 interface Props {
   line: LineConfig;
   stationName: string;
-  /** Whether this is the station nearest the device. */
-  nearest: boolean;
   departures: DepartureDto[] | undefined;
   /** The selected station's index on the line. */
   stationIndex: number;
@@ -41,7 +39,7 @@ function stillDue(d: DepartureDto, stationIndex: number, vehicles: VehicleDto[],
 }
 
 /** The "following trains" list from a Metro platform display, in the line's colour. */
-export function StationBoard({ line, stationName, nearest, departures, stationIndex, vehicles, now, onClose }: Props) {
+export function StationBoard({ line, stationName, departures, stationIndex, vehicles, now, onClose }: Props) {
   // Shared-line trains can terminate off our line, in which case the destination is already a name.
   const name = (id: string | null) => line.stations.find((s) => s.id === id)?.name ?? id ?? "";
   const upcoming = (departures ?? []).filter((d) => stillDue(d, stationIndex, vehicles, now)).slice(0, 4);
@@ -51,10 +49,7 @@ export function StationBoard({ line, stationName, nearest, departures, stationIn
       <button className="pid-close" onClick={onClose} aria-label="Close">
         ×
       </button>
-      <h2 className="pid-station">
-        {stationName}
-        {nearest && <span className="pid-nearest">Nearest to you</span>}
-      </h2>
+      <h2 className="pid-station">{stationName}</h2>
       {departures === undefined ? (
         <p className="pid-empty">Loading…</p>
       ) : upcoming.length === 0 ? (

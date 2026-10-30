@@ -98,7 +98,7 @@ export function App() {
             Show nearest station
           </label>
           <span className="muted" aria-live="polite">
-            {nearestText(nearest, (id) => line.stations.find((s) => s.id === id)?.name ?? id)}
+            {nearestText(nearest)}
           </span>
         </div>
       </header>
@@ -124,7 +124,6 @@ export function App() {
                 <StationBoard
                   line={line}
                   stationName={line.stations.find((s) => s.id === selected)?.name ?? selected}
-                  nearest={selected === nearestId}
                   departures={departures.data?.stations[selected]}
                   stationIndex={line.stations.findIndex((s) => s.id === selected)}
                   vehicles={vehicles.data?.vehicles ?? []}
@@ -144,19 +143,16 @@ export function App() {
   );
 }
 
-function nearestText(nearest: ReturnType<typeof useNearestStation>, name: (id: string) => string) {
+/** Only says something when the location can't be used. */
+function nearestText(nearest: ReturnType<typeof useNearestStation>) {
   switch (nearest.status) {
     case "off":
-      return null;
     case "locating":
-      return "Finding your location…";
+    case "found":
+      return null;
     case "denied":
       return "Location is blocked for this site in your browser settings";
     case "unavailable":
       return "Couldn't get your location";
-    case "found": {
-      const away = nearest.metres < 1000 ? `${Math.round(nearest.metres / 50) * 50} m` : `${(nearest.metres / 1000).toFixed(1)} km`;
-      return `${name(nearest.id)}, ${away} away`;
-    }
   }
 }
