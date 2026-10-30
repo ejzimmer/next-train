@@ -136,6 +136,9 @@ footer { margin-top: 24px; }
 .cal-key .cal-day { width: 24px; height: 20px; }
 .cal-key .moon { width: 14px; height: 14px; }
 .bus-stretch { stroke: #ffffff; stroke-width: 3; stroke-dasharray: 6 6; fill: none; }
+.train.shared { fill: #ffffff; }
+.train.shared.stopped { fill: #0072ce; stroke: #ffffff; }
+.train.shared.stale { fill: #c9c9c9; stroke: #7a8a99; }
 .legend { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 0; margin: 4px 0 0; }
 .legend li { display: flex; align-items: center; gap: 4px; }
 .legend svg { overflow: visible; }

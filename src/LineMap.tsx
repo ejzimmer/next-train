@@ -11,6 +11,8 @@ const BOARD_WIDTH = 380;
 const BOARD_ROOM = 220;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
 const MARGIN = 24;
+/** Trains on this line keep the usual colours; trains on other lines are white, as shared-track trains were before. */
+const HOME_LINE = "hurstbridge";
 
 interface Props {
   /** The lines switched on. */
@@ -220,7 +222,7 @@ export function LineMap({ lines, vehicles, departures, closedStretches, now, sel
             return (
               <g
                 key={v.id}
-                className={`train${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
               >
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
@@ -235,7 +237,14 @@ export function LineMap({ lines, vehicles, departures, closedStretches, now, sel
             );
           })}
         </svg>
-        {lines.length > 0 && <Legend closed={closedStretches.length > 0} colour={lines[0].colour} />}
+        {lines.length > 0 && (
+          <Legend
+            home={lines.some((l) => l.id === HOME_LINE)}
+            others={lines.some((l) => l.id !== HOME_LINE)}
+            closed={closedStretches.length > 0}
+            colour={lines[0].colour}
+          />
+        )}
         {boardPos && (
           <div className="board-anchor" style={{ ...boardPos, width: BOARD_WIDTH }}>
             {board}
@@ -265,9 +274,15 @@ function boardPosition(s: MapStation, at: { x: number; y: number }, width: numbe
 
 const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
 
-function Legend({ closed, colour }: { closed: boolean; colour: string }) {
+function Legend({ home, others, closed, colour }: { home: boolean; others: boolean; closed: boolean; colour: string }) {
+  const homeName = LINES.find((l) => l.id === HOME_LINE)!.name;
   const items: [string, string][] = [
-    ["train", "Train"],
+    ...(home && others
+      ? ([
+          ["train", `${homeName} train`],
+          ["train shared", "Other trains"],
+        ] as [string, string][])
+      : [[home ? "train" : "train shared", "Train"] as [string, string]]),
     ["train stopped", "Stopped"],
     ["train stale", "No recent update"],
   ];
