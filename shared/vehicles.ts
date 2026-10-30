@@ -8,7 +8,7 @@ import type { LineConfig, LineData, VehicleDto, VehiclesResponse } from "./types
 const MAX_OFF_LINE = 1500;
 
 /** Scheduled start of a trip, in seconds after midnight (-1 when unknown). */
-function startOf(tripId: string, data: LineData) {
+export function startOf(tripId: string, data: LineData) {
   return data.times?.trips[tripId]?.[1] ?? -1;
 }
 

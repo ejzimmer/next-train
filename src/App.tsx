@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import stationData from "../data/stations.json";
 import { LINES } from "../shared/network";
-import type { AlertDto, LineConfig, NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
+import type { NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
 import { LineMap } from "./LineMap";
 import { LineSwitches } from "./LineSwitches";
@@ -74,19 +74,14 @@ export function App() {
     [vehicles.data, lineIds],
   );
   const shownDepartures = departures.data?.departures.filter((d) => lineIds.includes(d.line));
-  // The same works are posted against each line they affect: show them once.
-  // The same works are posted against each line they affect: show them once, with every line shown that they're on.
-  const shownAlerts = useMemo(() => {
-    const seen = new Map<string, { alert: AlertDto; lines: LineConfig[] }>();
-    for (const l of lines)
-      for (const a of alerts.data?.lines[l.id] ?? []) {
-        const key = `${a.header}\n${a.description}`;
-        const entry = seen.get(key) ?? { alert: a, lines: [] };
-        entry.lines.push(l);
-        seen.set(key, entry);
-      }
-    return [...seen.values()].sort((x, y) => (x.alert.start ?? 0) - (y.alert.start ?? 0));
-  }, [alerts.data, lines]);
+  // Each line's alerts; Disruptions merges the ones that read the same.
+  const shownAlerts = useMemo(
+    () =>
+      lines
+        .flatMap((l) => (alerts.data?.lines[l.id] ?? []).map((alert) => ({ alert, lines: [l] })))
+        .sort((x, y) => (x.alert.start ?? 0) - (y.alert.start ?? 0)),
+    [alerts.data, lines],
+  );
   const closedStretches = lines.flatMap((l) =>
     (alerts.data?.lines[l.id] ?? [])
       .filter((a) => a.stretch && (!a.start || a.start <= now))

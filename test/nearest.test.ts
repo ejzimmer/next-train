@@ -20,4 +20,10 @@ describe("nearest station", () => {
       metres: 0,
     });
   });
+
+  it("skips stations with no location", () => {
+    expect(nearest({ lat: -37.7135, lon: 145.1488 }, { eltham: undefined, heidelberg: stations.heidelberg })?.id).toBe(
+      "heidelberg",
+    );
+  });
 });
