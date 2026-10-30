@@ -37,6 +37,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
   const via = trip?.viaLoop == null ? "" : trip.viaLoop ? " via City Loop" : " direct";
   const [next, ...rest] = trip?.stops ?? [];
   const [showCars, setShowCars] = useState(false);
+  const [showStops, setShowStops] = useState(false);
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -68,25 +69,28 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
         <span className="pid-detail">Updated {ago(now - vehicle.timestamp)}</span>
       </div>
       {next && (
-        <div className="pid-row" style={{ borderLeftColor: line?.colour }}>
+        // The next stop; clicking it shows or hides the rest.
+        <button
+          className="pid-row next-stop"
+          style={{ borderLeftColor: line?.colour }}
+          aria-expanded={rest.length ? showStops : undefined}
+          disabled={!rest.length}
+          onClick={() => setShowStops(!showStops)}
+        >
           <span className="pid-time">{formatTime(next.time)}</span>
           <span className="pid-dest">{name(next.station)}</span>
           {next.platform && <span className="pid-detail">Plat {next.platform}</span>}
           {trip!.delay != null && <span className="pid-mins">{delayText(trip!.delay)}</span>}
-        </div>
+        </button>
       )}
-      {rest.length > 0 && (
-        <details className="stops">
-          <summary>Remaining stops</summary>
-          {rest.map((s) => (
-            <div key={s.station + s.time} className="stop-row">
-              <span className="pid-time">{formatTime(s.time)}</span>
-              <span className="pid-dest">{name(s.station)}</span>
-              {s.platform && <span className="pid-detail">Plat {s.platform}</span>}
-            </div>
-          ))}
-        </details>
-      )}
+      {showStops &&
+        rest.map((s) => (
+          <div key={s.station + s.time} className="stop-row">
+            <span className="pid-time">{formatTime(s.time)}</span>
+            <span className="pid-dest">{name(s.station)}</span>
+            {s.platform && <span className="pid-detail">Plat {s.platform}</span>}
+          </div>
+        ))}
       <div className="train-card-buttons">
         <button className="card-button" onClick={() => onBoard(!boarded)}>
           {boarded ? "Detrain" : "Board train"}
