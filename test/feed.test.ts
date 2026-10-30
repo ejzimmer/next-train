@@ -6,7 +6,7 @@ import { buildDepartures, withScheduledGaps } from "../shared/departures";
 import { lines } from "../shared/lines";
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { calendarWeeks, disruptedDays } from "../src/calendar";
-import { matchRoute } from "../shared/routes";
+import { isLineRoute, progress } from "../shared/routes";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
 import { trainType } from "../shared/trainType";
@@ -22,9 +22,11 @@ const line: LineConfig = {
   mode: "metro-train",
   name: "Test",
   colour: "#BE1014",
+  textColour: "#FFFFFF",
+  group: "clifton-hill",
   routeIdMatch: "-HBE:",
   platformStations: ["a"],
-  schematic: { width: 300, height: 100 },
+  track: [],
   stations: [
     { id: "a", name: "A", x: 0, y: 50, label: "b" },
     { id: "b", name: "B", x: 100, y: 50, label: "b" },
@@ -111,29 +113,24 @@ const vehiclesFeed23 = decodeFeed(readFileSync(new URL("./fixtures/vehicle-posit
 const alertsFeed = decodeFeed(readFileSync(new URL("./fixtures/service-alerts.pb", import.meta.url)));
 const hurstbridge = lines.hurstbridge;
 
-describe("matchRoute", () => {
-  it("knows the line's own routes and the shared Mernda route, but not replacement buses", () => {
+describe("isLineRoute", () => {
+  it("knows the line's own trains, but not its replacement buses or other lines", () => {
     const cfg = hurstbridge.config;
-    expect(matchRoute("aus:vic:vic-02-HBE:", cfg)).toEqual({ route: null, until: cfg.stations.length - 1 });
-    expect(matchRoute("aus:vic:vic-02-MDD:", cfg)).toEqual({ route: "Mernda", until: 10 });
-    expect(matchRoute("aus:vic:vic-02-HBE-R:", cfg)).toBeNull();
-    expect(matchRoute("aus:vic:vic-02-SUY:", cfg)).toBeNull();
+    expect(isLineRoute("aus:vic:vic-02-HBE:", cfg)).toBe(true);
+    expect(isLineRoute("aus:vic:vic-02-HBE-R:", cfg)).toBe(false);
+    expect(isLineRoute("aus:vic:vic-02-MDD:", cfg)).toBe(false);
   });
 });
 
-describe("buildVehicles with shared track", () => {
+describe("buildVehicles across the network", () => {
   const res = buildVehicles(vehiclesFeed23, hurstbridge.config, hurstbridge.data);
+  const mernda = buildVehicles(vehiclesFeed23, lines.mernda.config, lines.mernda.data);
 
-  it("shows Mernda trains only between the city and Clifton Hill", () => {
-    const mernda = res.vehicles.filter((v) => v.route === "Mernda");
-    expect(mernda.length).toBeGreaterThan(0);
-    for (const v of mernda) expect(v.segment).toBeLessThan(10);
-    // Mernda trains up near Thomastown are on their own line, not ours.
-    expect(res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1166")).toBeUndefined();
-    const mernda1769 = res.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1769");
-    expect(mernda1769?.direction).toBe("outbound");
-    // The timetable's terminus, not just the line's far end.
-    expect(mernda1769?.destination).toBe("Mernda");
+  it("puts each train on its own line only", () => {
+    expect(res.vehicles.every((v) => v.line === "hurstbridge" && v.tripId.includes("HBE"))).toBe(true);
+    // Mernda trains up near Thomastown are on the Mernda line, past Clifton Hill.
+    const thomastown = mernda.vehicles.find((v) => v.tripId === "02-MDD--72-T6-1166")!;
+    expect(thomastown.segment).toBeGreaterThan(10);
   });
 
   it("lists a train once when it's reported against two trips", () => {
@@ -160,7 +157,9 @@ describe("buildVehicles with shared track", () => {
         entity: tripIds.map(report),
       });
     for (const order of [["02-HBE--72-T3-1299", "02-HBE--72-T3-1392"], ["02-HBE--72-T3-1392", "02-HBE--72-T3-1299"]]) {
-      const { vehicles } = buildVehicles(feed(...order), hurstbridge.config, hurstbridge.data);
+      // Their scheduled starts, as in that day's timetable: 1299 earlier, 1392 later.
+      const times = { patterns: [], trips: { "02-HBE--72-T3-1299": [0, 77000], "02-HBE--72-T3-1392": [0, 78500] } } as unknown as LineTimes;
+      const { vehicles } = buildVehicles(feed(...order), hurstbridge.config, { ...hurstbridge.data, times });
       expect(vehicles.map((v) => v.tripId)).toEqual(["02-HBE--72-T3-1392"]);
     }
   });

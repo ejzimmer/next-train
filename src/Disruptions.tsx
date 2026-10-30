@@ -1,11 +1,15 @@
+import { useState } from "react";
+import { LINES, STATIONS } from "../shared/network";
 import type { AlertDto, LineConfig } from "../shared/types";
 import { calendarWeeks, disruptedDays } from "./calendar";
 
 interface Props {
-  line: LineConfig;
-  alerts: AlertDto[] | undefined;
+  /** Each alert with the lines it's on. */
+  alerts: { alert: AlertDto; lines: LineConfig[] }[] | undefined;
   now: number;
 }
+
+const COLLAPSED_KEY = "disruptionsCollapsed";
 
 const clock = new Intl.DateTimeFormat("en-AU", {
   hour: "numeric",
@@ -62,17 +66,55 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
   );
 }
 
-function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: number }) {
-  const name = (id: string) => line.stations.find((s) => s.id === id)?.name ?? id;
+/** What a notice shows above its details. */
+function summary(alert: AlertDto, now: number) {
+  const name = (id: string) => STATIONS[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
-  const live = !alert.start || alert.start <= now;
   // When the trains stop each night, from the same periods the calendar uses.
   const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
   const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
+  return { title, sub, after, days };
+}
+
+interface Merged {
+  alert: AlertDto;
+  lines: LineConfig[];
+  /** Every different description among the alerts merged into this notice. */
+  descriptions: string[];
+}
+
+/** Alerts that would show the same notice (e.g. each line's "No City Loop" for the same nights) become one. */
+function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: number): Merged[] {
+  const byKey = new Map<string, Merged>();
+  for (const { alert, lines } of alerts) {
+    const { title, sub, after, days } = summary(alert, now);
+    const key = JSON.stringify([title, sub, after, [...days]]);
+    const merged = byKey.get(key);
+    if (!merged) {
+      byKey.set(key, { alert, lines: [...lines], descriptions: [alert.description] });
+      continue;
+    }
+    for (const l of lines) if (!merged.lines.includes(l)) merged.lines.push(l);
+    if (!merged.descriptions.includes(alert.description)) merged.descriptions.push(alert.description);
+  }
+  for (const m of byKey.values()) m.lines.sort((a, b) => LINES.indexOf(a) - LINES.indexOf(b));
+  return [...byKey.values()];
+}
+
+function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
+  const { title, sub, after } = summary(alert, now);
+  const live = !alert.start || alert.start <= now;
   return (
     <section className={`notice${live ? " live" : ""}`}>
+      <ul className="notice-lines">
+        {lines.map((l) => (
+          <li key={l.id} style={{ background: l.colour, color: l.textColour }}>
+            {l.name}
+          </li>
+        ))}
+      </ul>
       <h2>
         {title}
         {!sub && after && <span className="notice-after"> {after}</span>}
@@ -86,7 +128,9 @@ function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: 
       <Calendar alert={alert} now={now} />
       <details>
         <summary>Details</summary>
-        <p>{alert.description}</p>
+        {descriptions.map((d) => (
+          <p key={d}>{d}</p>
+        ))}
         {alert.url && (
           <p>
             <a href={alert.url} target="_blank" rel="noreferrer">
@@ -99,20 +143,41 @@ function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: 
   );
 }
 
-/** All the line's disruptions on one board, styled after Metro's station posters. */
-export function Disruptions({ line, alerts, now }: Props) {
+function savedCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** All the disruptions on one board, styled after Metro's station posters. The orange bar folds it away. */
+export function Disruptions({ alerts, now }: Props) {
+  const [collapsed, setCollapsed] = useState(savedCollapsed);
   if (!alerts?.length) return null;
-  const hasNight = alerts.some((a) => [...disruptedDays(a.periods, now).values()].includes("night"));
+  const toggle = () => {
+    setCollapsed(!collapsed);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, collapsed ? "0" : "1");
+    } catch {
+      // Not remembered; fine.
+    }
+  };
+  const notices = mergeAlike(alerts, now);
+  const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
   return (
-    <aside className="disruptions" aria-label="Disruptions">
-      <div className="disruptions-bar">
+    <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
+      <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">
         <span className="bang" aria-hidden>
           !
         </span>
-      </div>
-      <div className="disruptions-body">
-        {alerts.map((a) => (
-          <Notice key={a.id} line={line} alert={a} now={now} />
+        <svg className="chevron" viewBox="0 0 24 24" aria-hidden>
+          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <div className="disruptions-body" hidden={collapsed}>
+        {notices.map((n) => (
+          <Notice key={n.alert.id} {...n} now={now} />
         ))}
         <ul className="cal-key">
           <li>

@@ -1,5 +1,6 @@
 /**
- * Builds data/<line>.stations.json and data/<line>.trips.json from PTV's GTFS Schedule zip.
+ * Builds data/stations.json (every station on the map) and data/<line>.trips.json and .times.json
+ * for each line from PTV's GTFS Schedule zip.
  *
  *   npm run gtfs -- [path-or-url-to-gtfs.zip]
  *
@@ -10,11 +11,10 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { unzipSync, strFromU8 } from "fflate";
 import { parse } from "csv-parse/sync";
 import type { Direction, LineConfig, LineData, LineTimes } from "../shared/types";
-import hurstbridge from "../lines/hurstbridge.json";
+import { LINES, STATIONS } from "../shared/network";
 
 const DEFAULT_SOURCE = "https://data.ptv.vic.gov.au/downloads/gtfs.zip";
 const MODE_FOLDER: Record<LineConfig["mode"], string> = { "metro-train": "2", tram: "3" };
-const LINES = [hurstbridge as LineConfig];
 
 type Row = Record<string, string>;
 
@@ -41,12 +41,14 @@ function stationName(stopName: string): string {
     .toLowerCase();
 }
 
-function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
+type Files = Record<string, Uint8Array>;
+
+function buildStations(files: Files) {
   const stops = csv(files, "stops.txt");
   const stations: LineData["stations"] = {};
   const stationOfStop = new Map<string, string>();
 
-  for (const station of line.stations) {
+  for (const station of Object.values(STATIONS)) {
     const named = stops.filter((s) => stationName(s.stop_name) === (station.gtfsName ?? station.name).toLowerCase());
     const parent = named.find((s) => s.location_type === "1");
     // Platforms only: skip entrances (location_type 2) and rail replacement bus stops.
@@ -60,30 +62,32 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
     const stopIds = [...new Set([...(parent ? [parent.stop_id] : []), ...members.map((m) => m.stop_id)])];
     stopIds.forEach((id) => stationOfStop.set(id, station.id));
     stations[station.id] = { lat: Number(anchor.stop_lat), lon: Number(anchor.stop_lon), stopIds, platforms };
-    console.log(`${station.name}: ${stopIds.length} stop ids, platforms ${JSON.stringify(Object.values(platforms))}`);
   }
+  console.log(`${Object.keys(stations).length} stations`);
+  writeFileSync("data/stations.json", JSON.stringify({ generatedAt: new Date().toISOString(), stations }) + "\n");
+  return { stops, stationOfStop };
+}
 
-  // Our own routes, plus lines that share part of our track (their trains show on the map there).
-  const matchers = [line.routeIdMatch, ...(line.shared ?? []).map((s) => s.routeIdMatch)];
-  const routes = csv(files, "routes.txt").filter((r) => matchers.some((m) => r.route_id.includes(m)));
+function buildLine(line: LineConfig, files: Files, stops: Row[], allStationOfStop: Map<string, string>, stopTimes: string[][], header: string[]) {
+  // Only this line's stations count as being on the line.
+  const onLine = new Set(line.stations.map((s) => s.id));
+  const stationOfStop = new Map([...allStationOfStop].filter(([, id]) => onLine.has(id)));
+
+  const routes = csv(files, "routes.txt").filter((r) => r.route_id.includes(line.routeIdMatch));
   const routeIds = new Set(routes.map((r) => r.route_id));
   const tripIds = new Set(csv(files, "trips.txt").filter((t) => routeIds.has(t.route_id)).map((t) => t.trip_id));
   console.log(`Routes ${[...routeIds].join(", ")}: ${tripIds.size} trips`);
 
-  // stop_times.txt is large, so scan it line by line instead of parsing it all.
   // For each trip: its last stop, and its first and last stops on our line.
   type End = [seq: number, stop: string];
   const ends = new Map<string, { last: End; firstOn?: End; lastOn?: End }>();
   // Scheduled departure (seconds after midnight) at each of a trip's stops on our line.
   const schedule = new Map<string, [seq: number, stop: string, time: number][]>();
-  const text = strFromU8(files["stop_times.txt"]);
-  const header = text.slice(0, text.indexOf("\n")).replace(/^\uFEFF/, "").trim().split(",");
   const [ti, si, qi, ai, di] = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((c) =>
     header.indexOf(c),
   );
   const seconds = (hms: string) => hms.split(":").reduce((t, part) => t * 60 + Number(part), 0);
-  for (const row of text.split("\n")) {
-    const cols = row.split(",");
+  for (const cols of stopTimes) {
     const tripId = cols[ti]?.replace(/"/g, "");
     if (!tripId || !tripIds.has(tripId)) continue;
     const end: End = [Number(cols[qi]?.replace(/"/g, "")), cols[si].replace(/"/g, "")];
@@ -114,10 +118,6 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
   }
   console.log(`${Object.keys(trips).length} trips with direction`);
 
-  writeFileSync(
-    `data/${line.id}.stations.json`,
-    JSON.stringify({ generatedAt: new Date().toISOString(), stations }, null, 2) + "\n",
-  );
   writeFileSync(`data/${line.id}.trips.json`, JSON.stringify(trips) + "\n");
 
   // Many trips share a stopping pattern and running times, so store each pattern once
@@ -138,8 +138,16 @@ function buildLine(line: LineConfig, files: Record<string, Uint8Array>) {
 }
 
 const outer = unzipSync(await load(process.argv[2] ?? DEFAULT_SOURCE));
+const folder = MODE_FOLDER["metro-train"];
+const inner = outer[`${folder}/google_transit.zip`];
+if (!inner) throw new Error(`Folder ${folder} missing; found ${Object.keys(outer).join(", ")}`);
+const files = unzipSync(inner);
+const { stops, stationOfStop } = buildStations(files);
+// stop_times.txt is large, so split it into rows once instead of parsing it all.
+const text = strFromU8(files["stop_times.txt"]);
+const header = text.slice(0, text.indexOf("\n")).replace(/^\uFEFF/, "").trim().split(",");
+const stopTimes = text.split("\n").map((row) => row.split(","));
 for (const line of LINES) {
-  const inner = outer[`${MODE_FOLDER[line.mode]}/google_transit.zip`];
-  if (!inner) throw new Error(`Folder ${MODE_FOLDER[line.mode]} missing; found ${Object.keys(outer).join(", ")}`);
-  buildLine(line, unzipSync(inner));
+  console.log(`\n${line.name}`);
+  buildLine(line, files, stops, stationOfStop, stopTimes, header);
 }

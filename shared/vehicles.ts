@@ -1,13 +1,11 @@
 import { toNum, type FeedMessage } from "./feed";
 import { directionFromBearing, placeOnLine, segmentBearing } from "./position";
-import { matchRoute } from "./routes";
+import { isLineRoute } from "./routes";
 import { trainType } from "./trainType";
 import type { LineConfig, LineData, VehicleDto, VehiclesResponse } from "./types";
 
 /** Trains further than this from the line (in metres) are left off the map. */
 const MAX_OFF_LINE = 1500;
-/** Shared-line trains must be closer, so ones that have turned off towards their own line drop out. */
-const MAX_OFF_SHARED = 300;
 
 /** Scheduled start of a trip, in seconds after midnight (-1 when unknown). */
 function startOf(tripId: string, data: LineData) {
@@ -19,13 +17,10 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
   for (const entity of feed.entity) {
     const v = entity.vehicle;
     const tripId = v?.trip?.tripId;
-    const match = matchRoute(v?.trip?.routeId, line);
-    if (!v?.position || !tripId || !match) continue;
+    if (!v?.position || !tripId || !isLineRoute(v.trip?.routeId, line)) continue;
     const placed = placeOnLine(v.position.latitude, v.position.longitude, line, data);
-    if (!placed || placed.offLine > (match.route ? MAX_OFF_SHARED : MAX_OFF_LINE)) continue;
-    // A shared-line train placed past the junction is on its own line, not ours.
-    if (placed.segment >= match.until) continue;
-    const segment = Math.min(placed.segment, line.stations.length - 2);
+    if (!placed || placed.offLine > MAX_OFF_LINE) continue;
+    const segment = placed.segment;
     const direction =
       data.trips[tripId]?.dir ??
       (v.position.bearing != null
@@ -42,7 +37,7 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
     byId.set(id, {
       id,
       tripId,
-      route: match.route,
+      line: line.id,
       destination: data.trips[tripId]?.dest ?? null,
       timestamp,
       direction,

@@ -9,27 +9,31 @@ export interface SchematicStation {
   x: number;
   y: number;
   label: "t" | "b" | "l" | "r";
+  /** Shifts the label a few px from its usual place. */
+  nudge?: [number, number];
   /** Bends in the line between the previous station and this one. */
   via?: [number, number][];
 }
 
-/** Hand-written line config (lines/*.json). Stations are listed city end first. */
+/** A line on the network map (shared/network.ts). Stations are listed city end first. */
 export interface LineConfig {
   id: string;
   mode: "metro-train" | "tram";
   name: string;
   colour: string;
+  /** Text colour on the line's colour. */
+  textColour: string;
+  /** Lines in the same group share a colour and are drawn as one where they share track. */
+  group: string;
   /** Substring matched against GTFS-R route_id, e.g. "-HBE:" for aus:vic:vic-02-HBE: */
   routeIdMatch: string;
-  /** Other lines that share track with this one, from the city end up to and including `until` (a station id). */
-  shared?: { name: string; routeIdMatch: string; until: string }[];
   /** First and last station of the City Loop section, skipped when trains run direct to Flinders Street. */
   cityLoop?: [string, string];
   /** Stations whose departures show a platform number. */
   platformStations: string[];
-  /** Size of the schematic drawing in px, and any extra track drawn but not used for placing trains. */
-  schematic: { width: number; height: number; loopClosure?: [number, number][] };
   stations: SchematicStation[];
+  /** Track between stations that aren't next to each other in `stations`, e.g. direct to Flinders Street. */
+  track: { from: string; to: string; via: [number, number][] }[];
 }
 
 /** Generated from GTFS static by scripts/build-gtfs.ts (data/*.json). */
@@ -39,8 +43,8 @@ export interface LineData {
     string,
     { lat: number; lon: number; stopIds: string[]; platforms: Record<string, string> }
   >;
-  /** Static trips on this line and shared lines: direction, and the terminating station id
-   * (or the terminus name when it's off this line, e.g. "Mernda"). */
+  /** Static trips on this line: direction, and the terminating station id
+   * (or the terminus name when it's off this line, e.g. a Stony Point train running on to the city). */
   trips: Record<string, { dir: Direction; dest: string }>;
   /** Scheduled times, for filling in stops the realtime feed leaves out. */
   times?: LineTimes;
@@ -56,14 +60,15 @@ export interface LineTimes {
 export interface VehicleDto {
   id: string;
   tripId: string;
-  /** Name of the shared line this train is running on, or null for this line's own trains. */
-  route: string | null;
-  /** Where this trip terminates from the static timetable (station id, or a name off our line); null if unknown. */
+  /** The line's id. */
+  line: string;
+  /** Where this trip terminates from the static timetable (station id, or a name off the line); null if unknown. */
   destination: string | null;
   /** Unix seconds of the position report. */
   timestamp: number;
   direction: Direction | null;
-  /** Index of the station segment start (0 = city end) and fraction towards the next station. */
+  /** Index of the station segment start (0 = city end) and fraction towards the next station.
+   * Segments past the last station are the line's extra `track`, in order. */
   segment: number;
   fraction: number;
   /** Inferred from the car numbers in the vehicle id; null when unrecognised. */
@@ -78,7 +83,8 @@ export interface DepartureDto {
   direction: Direction | null;
   /** Station id on this line, or a terminus name off it. */
   destination: string | null;
-  route: string | null;
+  /** The line's id. */
+  line: string;
   platform: string | null;
   cancelled: boolean;
 }
@@ -91,6 +97,12 @@ export interface VehiclesResponse {
 export interface DeparturesResponse {
   feedTimestamp: number;
   stations: Record<string, DepartureDto[]>;
+}
+
+/** Departures from one station, on every line that stops there. */
+export interface StationDeparturesResponse {
+  feedTimestamp: number;
+  departures: DepartureDto[];
 }
 
 export interface AlertDto {
@@ -116,4 +128,10 @@ export interface AlertDto {
 export interface AlertsResponse {
   feedTimestamp: number;
   alerts: AlertDto[];
+}
+
+/** Every line's alerts. The same alert can be on several lines, each with its own stretch. */
+export interface NetworkAlertsResponse {
+  feedTimestamp: number;
+  lines: Record<string, AlertDto[]>;
 }

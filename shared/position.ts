@@ -1,3 +1,4 @@
+import { segmentCount, segmentEnds } from "./routes";
 import type { Direction, LineConfig, LineData } from "./types";
 
 interface Point { x: number; y: number }
@@ -16,18 +17,18 @@ export interface Placement {
 }
 
 /**
- * Snaps a lat/lon to the nearest point on the straight segments between consecutive stations.
- * Returns null when the line has fewer than two stations with coordinates.
+ * Snaps a lat/lon to the nearest point on the straight segments between consecutive stations
+ * and along the line's extra track. Returns null when a station has no coordinates.
  */
 export function placeOnLine(lat: number, lon: number, line: LineConfig, data: LineData): Placement | null {
-  const pts = line.stations.map((s) => data.stations[s.id]);
-  if (pts.length < 2 || pts.some((p) => !p)) return null;
-  const lat0 = pts[0].lat;
+  if (line.stations.some((s) => !data.stations[s.id]) || line.stations.length < 2) return null;
+  const lat0 = data.stations[line.stations[0].id].lat;
   const p = project(lat, lon, lat0);
   let best: Placement | null = null;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const a = project(pts[i].lat, pts[i].lon, lat0);
-    const b = project(pts[i + 1].lat, pts[i + 1].lon, lat0);
+  for (let i = 0; i < segmentCount(line); i++) {
+    const [from, to] = segmentEnds(line, i).map((id) => data.stations[id]);
+    const a = project(from.lat, from.lon, lat0);
+    const b = project(to.lat, to.lon, lat0);
     const dx = b.x - a.x;
     const dy = b.y - a.y;
     const len2 = dx * dx + dy * dy;
@@ -40,8 +41,7 @@ export function placeOnLine(lat: number, lon: number, line: LineConfig, data: Li
 
 /** Bearing in degrees (0 = north) from station `segment` to the next one, i.e. the outbound direction. */
 export function segmentBearing(segment: number, line: LineConfig, data: LineData): number {
-  const a = data.stations[line.stations[segment].id];
-  const b = data.stations[line.stations[segment + 1].id];
+  const [a, b] = segmentEnds(line, segment).map((id) => data.stations[id]);
   const p = project(a.lat, a.lon, a.lat);
   const q = project(b.lat, b.lon, a.lat);
   return ((Math.atan2(q.x - p.x, q.y - p.y) * 180) / Math.PI + 360) % 360;
