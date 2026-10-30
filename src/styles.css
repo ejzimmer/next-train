@@ -198,3 +198,19 @@ footer { margin-top: 24px; }
 .yard-pole { stroke: var(--muted); stroke-width: 4; }
 .yard-lamp { fill: #fffbe0; stroke: var(--muted); stroke-width: 2; }
 .yard-text { font-size: 1.4rem; font-weight: 800; margin: 16px 0 0; }
+.train-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; }
+.cars { position: relative; }
+.type-button {
+  font: inherit; font-size: 0.9rem; padding: 1px 6px; margin-left: -6px; border: none; border-radius: 4px;
+  background: transparent; color: #111; cursor: pointer;
+}
+.type-button:hover, .type-button[aria-expanded="true"] { background: #e3e6ea; }
+.type-button:focus-visible { outline: 2px solid #0072ce; }
+.cars-pop {
+  position: absolute; left: -6px; top: calc(100% + 4px); z-index: 1; padding: 4px 8px; border-radius: 4px;
+  background: #111; color: #fff; font-size: 0.8rem; white-space: nowrap;
+}
+.stops summary { cursor: pointer; font-size: 0.85rem; color: #555; padding: 6px 0 2px; border-radius: 4px; }
+.stops summary:hover { background: #e3e6ea; }
+.stop-row { display: flex; align-items: center; gap: 12px; padding: 3px 0 3px 14px; font-size: 0.9rem; }
+.stop-row .pid-dest { font-weight: 600; }

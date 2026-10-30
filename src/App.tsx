@@ -222,6 +222,8 @@ export function App() {
                 <TrainCard
                   vehicle={cardVehicle}
                   destination={cardVehicle.destination}
+                  now={now}
+                  pollMs={POLL_MS}
                   boarded={boarded === cardVehicle.tripId}
                   onBoard={(on) => board(on ? cardVehicle.tripId : null)}
                   onClose={() => setSelectedTrain(null)}

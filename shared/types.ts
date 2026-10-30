@@ -89,6 +89,19 @@ export interface DepartureDto {
   cancelled: boolean;
 }
 
+/** One trip's remaining stops (/api/trip). */
+export interface TripDto {
+  tripId: string;
+  /** Station id, or a terminus name off the map. */
+  destination: string | null;
+  /** For trips ending at Flinders Street on a City Loop line: whether they get there round the Loop. */
+  viaLoop: boolean | null;
+  /** Seconds late (negative when early) at the next stop; null when the timetable doesn't know the trip. */
+  delay: number | null;
+  /** Stops still to come, the next one first. */
+  stops: { station: string; time: number; platform: string | null }[];
+}
+
 export interface VehiclesResponse {
   feedTimestamp: number;
   vehicles: VehicleDto[];
