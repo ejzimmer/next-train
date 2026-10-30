@@ -28,6 +28,9 @@ function minutes(time: number, now: number) {
   return mins < 1 ? "Now" : `${mins} min`;
 }
 
+/** How late a departure in the city can be and still be listed (see stillDue). */
+const CITY_GRACE = 2 * 60;
+
 /**
  * Whether a departure should still be listed. Predictions can pass while the train is still at the platform
  * (or hasn't reported for a while), so a late one stays up as "Now" until its train is seen past the station.
@@ -37,7 +40,17 @@ function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], no
   const v = vehicles.find((x) => x.tripId === d.tripId);
   const line = LINE_BY_ID[d.line];
   if (!v || !d.direction || !line) return false;
-  const stationIndex = line.stations.findIndex((s) => s.id === stationId);
+  const index = (id: string) => line.stations.findIndex((s) => s.id === id);
+  const stationIndex = index(stationId);
+  // Round the City Loop (run either way depending on the time of day), or between the ends of a track
+  // that skips stations, the order of the stations isn't the order the train passes them: just allow
+  // a couple of minutes' lateness there.
+  const loopEnd = line.cityLoop ? index(line.cityLoop[1]) : -1;
+  const skipped = line.track.some(({ from, to }) => {
+    const [a, b] = [index(from), index(to)].sort((x, y) => x - y);
+    return a < stationIndex && stationIndex < b;
+  });
+  if (stationIndex <= loopEnd || skipped) return d.time >= now - CITY_GRACE;
   const at = progress(line, v.segment, v.fraction);
   return d.direction === "outbound" ? at < stationIndex + 0.05 : at > stationIndex - 0.05;
 }

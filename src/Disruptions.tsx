@@ -79,6 +79,8 @@ function summary(alert: AlertDto, now: number) {
 }
 
 interface Merged {
+  /** What the merged alerts have in common. */
+  id: string;
   alert: AlertDto;
   lines: LineConfig[];
   /** Every different description among the alerts merged into this notice. */
@@ -93,7 +95,7 @@ function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: num
     const key = JSON.stringify([title, sub, after, [...days]]);
     const merged = byKey.get(key);
     if (!merged) {
-      byKey.set(key, { alert, lines: [...lines], descriptions: [alert.description] });
+      byKey.set(key, { id: key, alert, lines: [...lines], descriptions: [alert.description] });
       continue;
     }
     for (const l of lines) if (!merged.lines.includes(l)) merged.lines.push(l);
@@ -177,7 +179,7 @@ export function Disruptions({ alerts, now }: Props) {
       </button>
       <div className="disruptions-body" hidden={collapsed}>
         {notices.map((n) => (
-          <Notice key={n.alert.id} {...n} now={now} />
+          <Notice key={n.id} {...n} now={now} />
         ))}
         <ul className="cal-key">
           <li>

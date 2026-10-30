@@ -1,14 +1,14 @@
 import type { Config } from "@netlify/functions";
 import { fetchFeed } from "../../shared/feed";
 import { lines } from "../../shared/lines";
-import { buildVehicles } from "../../shared/vehicles";
+import { buildVehicles, startOf } from "../../shared/vehicles";
 import { apiKey, CACHE_HEADERS, errorResponse } from "../../shared/http";
 import type { VehicleDto, VehiclesResponse } from "../../shared/types";
 
 /**
  * Every line's trains from one feed request; the page shows the lines that are switched on.
  * A train running through from one line to another (Sunbury to Pakenham, say) can be reported on both:
- * it's kept on the line of its newest report.
+ * it's kept on the line of its newest report, or when both carry the same time, the later-starting trip.
  */
 export default async () => {
   try {
@@ -26,7 +26,11 @@ export default async () => {
 
 function newestPerTrain(vehicles: VehicleDto[]) {
   const byId = new Map<string, VehicleDto>();
-  for (const v of vehicles) if ((byId.get(v.id)?.timestamp ?? -1) < v.timestamp) byId.set(v.id, v);
+  const start = (v: VehicleDto) => startOf(v.tripId, lines[v.line].data);
+  for (const v of vehicles) {
+    const kept = byId.get(v.id);
+    if (!kept || kept.timestamp < v.timestamp || (kept.timestamp === v.timestamp && start(kept) < start(v))) byId.set(v.id, v);
+  }
   return [...byId.values()];
 }
 

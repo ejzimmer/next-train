@@ -146,24 +146,35 @@ export function LineMap({
   // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom.
   const [scale, setZoom] = useState(1);
   const [width, height] = [box.width * scale, box.height * scale];
-  // The latest scale, for the event handlers below.
-  const scaleRef = useRef(scale);
-  scaleRef.current = scale;
+  // The scale on screen, and the one asked for, which runs ahead of it while several zoom events
+  // arrive before the next render.
+  const shownScale = useRef(scale);
+  shownScale.current = scale;
+  const targetScale = useRef(scale);
+  const zoomAnchor = useRef<{ at: Pt; client: Pt } | null>(null);
 
   /** Zooms by `factor`, keeping the point at (clientX, clientY) where it is on screen. */
   const zoomBy = useRef((factor: number, clientX: number, clientY: number) => {
     const el = scroller.current;
     if (!el) return;
-    const from = scaleRef.current;
+    const from = targetScale.current;
     const to = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, from * factor));
     if (to === from) return;
-    const map = el.firstElementChild!.getBoundingClientRect();
-    const [x, y] = [clientX - map.left, clientY - map.top];
+    targetScale.current = to;
     setZoom(to);
+    if (zoomAnchor.current) return;
+    // The point under the cursor, in unscaled map units, put back under it once the new size is drawn.
+    const map = el.firstElementChild!.getBoundingClientRect();
+    zoomAnchor.current = {
+      at: [(clientX - map.left) / shownScale.current, (clientY - map.top) / shownScale.current],
+      client: [clientX, clientY],
+    };
     requestAnimationFrame(() => {
+      const { at, client } = zoomAnchor.current!;
+      zoomAnchor.current = null;
       const moved = el.firstElementChild!.getBoundingClientRect();
-      el.scrollLeft += moved.left + (x * to) / from - clientX;
-      window.scrollBy(0, moved.top + (y * to) / from - clientY);
+      el.scrollLeft += moved.left + at[0] * targetScale.current - client[0];
+      window.scrollBy(0, moved.top + at[1] * targetScale.current - client[1]);
     });
   }).current;
 
@@ -283,7 +294,12 @@ export function LineMap({
   const destinationOf = (v: VehicleDto) =>
     v.destination ?? departures?.find((d) => d.tripId === v.tripId)?.destination ?? null;
   // A line ends with a bar across it, unless another line switched on carries on through.
-  const throughStations = new Set(lines.flatMap((l) => l.stations.slice(1, -1).map((s) => s.id)));
+  const carriesOn = (line: LineConfig, id: string) =>
+    lines.some((o) => o !== line && o.stations.slice(0, -1).some((s) => s.id === id));
+  // A line that carries on from the end of another (Stony Point from Frankston) ends there too when drawn alone.
+  const startsFromEnd = (line: LineConfig) =>
+    LINES.some((o) => o.stations[o.stations.length - 1].id === line.stations[0].id) &&
+    !lines.some((o) => o !== line && o.stations.some((s) => s.id === line.stations[0].id));
 
   // On narrow screens the map scrolls sideways: bring the selected station into view.
   useEffect(() => {
@@ -326,7 +342,8 @@ export function LineMap({
                   <path key={i} d={pathOf(track)} strokeLinecap="round" />
                 ))}
                 <path d={pathOf(main)} strokeLinecap="round" />
-                {!throughStations.has(line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
+                {!carriesOn(line, line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
+                {startsFromEnd(line) && <EndBar points={[...geo.segments[0]].reverse()} />}
               </g>
             );
           })}

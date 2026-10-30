@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Place = { lat: number; lon: number };
 
@@ -11,9 +11,10 @@ export function distance(a: Place, b: Place) {
   return 2 * 6_371_000 * Math.asin(Math.sqrt(h));
 }
 
-export function nearest(here: Place, stations: Record<string, Place>) {
+export function nearest(here: Place, stations: Record<string, Place | undefined>) {
   let best: { id: string; metres: number } | null = null;
   for (const [id, place] of Object.entries(stations)) {
+    if (!place) continue;
     const metres = distance(here, place);
     if (!best || metres < best.metres) best = { id, metres };
   }
@@ -29,11 +30,16 @@ export type NearestState =
  * Watches for movement with low accuracy (wifi and cell towers rather than GPS, which is plenty
  * for picking a station and much easier on the battery), and stops while the tab is hidden.
  */
-export function useNearestStation(enabled: boolean, stations: Record<string, Place>): NearestState {
+export function useNearestStation(enabled: boolean, stations: Record<string, Place | undefined>): NearestState {
   const [state, setState] = useState<NearestState>({ status: "off" });
+  // Read when the position comes in, so a change of stations doesn't restart the watch.
+  const stationsRef = useRef(stations);
+  stationsRef.current = stations;
+  const last = useRef<Place | null>(null);
 
   useEffect(() => {
     if (!enabled) {
+      last.current = null;
       setState({ status: "off" });
       return;
     }
@@ -47,7 +53,8 @@ export function useNearestStation(enabled: boolean, stations: Record<string, Pla
       if (watch != null) return;
       watch = navigator.geolocation.watchPosition(
         ({ coords }) => {
-          const found = nearest({ lat: coords.latitude, lon: coords.longitude }, stations);
+          last.current = { lat: coords.latitude, lon: coords.longitude };
+          const found = nearest(last.current, stationsRef.current);
           if (found) setState({ status: "found", ...found });
         },
         (err) => setState({ status: err.code === err.PERMISSION_DENIED ? "denied" : "unavailable" }),
@@ -65,6 +72,13 @@ export function useNearestStation(enabled: boolean, stations: Record<string, Pla
       stop();
       document.removeEventListener("visibilitychange", onVisibility);
     };
+  }, [enabled]);
+
+  // The stations changed: pick again from the last position.
+  useEffect(() => {
+    if (!enabled || !last.current) return;
+    const found = nearest(last.current, stations);
+    if (found) setState({ status: "found", ...found });
   }, [enabled, stations]);
 
   return state;
