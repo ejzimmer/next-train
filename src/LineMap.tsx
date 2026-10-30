@@ -11,19 +11,9 @@ const BOARD_WIDTH = 380;
 const BOARD_ROOM = 220;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
 const MARGIN = 24;
-const MAX_ZOOM = 2;
+const [MIN_ZOOM, MAX_ZOOM] = [0.2, 3];
 /** Trains on this line keep the usual colours; trains on other lines are white, as shared-track trains were before. */
 const HOME_LINE = "hurstbridge";
-/** The window's size, kept up to date. */
-function useWindowSize() {
-  const [size, setSize] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
-  useEffect(() => {
-    const onResize = () => setSize({ width: window.innerWidth, height: window.innerHeight });
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-  return size;
-}
 
 interface Props {
   /** The lines switched on. */
@@ -149,25 +139,19 @@ export function LineMap({
     return { x: x0 - MARGIN, y: y0 - MARGIN, width: x1 - x0 + 2 * MARGIN, height: y1 - y0 + 2 * MARGIN };
   }, [stations]);
 
-  // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom, from small enough to fit the window to double size.
-  const [zoom, setZoom] = useState(1);
-  const win = useWindowSize();
-  const minScale = box.width ? Math.min(1, (win.width - 32) / box.width, (win.height - 24) / box.height) : 1;
-  const scale = Math.min(MAX_ZOOM, Math.max(minScale, zoom));
+  // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom.
+  const [scale, setZoom] = useState(1);
   const [width, height] = [box.width * scale, box.height * scale];
   // The latest scale, for the event handlers below.
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
-  const limitsRef = useRef([minScale, MAX_ZOOM]);
-  limitsRef.current = [minScale, MAX_ZOOM];
 
   /** Zooms by `factor`, keeping the point at (clientX, clientY) where it is on screen. */
   const zoomBy = useRef((factor: number, clientX: number, clientY: number) => {
     const el = scroller.current;
     if (!el) return;
-    const [lo, hi] = limitsRef.current;
     const from = scaleRef.current;
-    const to = Math.min(hi, Math.max(lo, from * factor));
+    const to = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, from * factor));
     if (to === from) return;
     const map = el.firstElementChild!.getBoundingClientRect();
     const [x, y] = [clientX - map.left, clientY - map.top];
