@@ -176,7 +176,7 @@ footer { margin-top: 24px; }
 .train:focus { outline: none; }
 .train-hit { fill: transparent; stroke: none; }
 .boarded { fill: none; stroke: var(--fg); stroke-width: 4; }
-.train-card-buttons { display: flex; gap: 8px; margin: 8px 0 2px; }
+.train-card-buttons { display: flex; justify-content: center; gap: 8px; margin: 16px 0 4px; }
 .card-button {
   font: inherit; font-size: 0.9rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer;
   border: none; background: transparent; color: #111;
@@ -187,8 +187,9 @@ footer { margin-top: 24px; }
 .card-button.primary:hover { filter: brightness(0.9); }
 .card-button:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
 .share { position: relative; display: inline-flex; align-items: center; }
+/* Beside Share, without moving the buttons. */
 .copied {
-  margin-left: 8px; padding: 2px 8px; border-radius: 10px; background: #111; color: #fff; font-size: 0.75rem;
+  position: absolute; left: calc(100% + 6px); padding: 2px 8px; border-radius: 10px; background: #111; color: #fff; font-size: 0.75rem;
 }
 
 /* "Trip finished": the train parked in a yard. */
