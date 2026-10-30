@@ -2,6 +2,7 @@ import type { DepartureDto, LineConfig, VehicleDto } from "../shared/types";
 
 interface Props {
   line: LineConfig;
+  stationName: string;
   departures: DepartureDto[] | undefined;
   /** The selected station's index on the line. */
   stationIndex: number;
@@ -25,7 +26,6 @@ function minutes(time: number, now: number) {
   return mins < 1 ? "Now" : `${mins} min`;
 }
 
-/** The "following trains" list from a Metro platform display, in the line's colour. */
 /**
  * Whether a departure should still be listed. Predictions can pass while the train is still at the platform
  * (or hasn't reported for a while), so a late one stays up as "Now" until its train is seen past the station.
@@ -38,16 +38,18 @@ function stillDue(d: DepartureDto, stationIndex: number, vehicles: VehicleDto[],
   return d.direction === "outbound" ? at < stationIndex + 0.05 : at > stationIndex - 0.05;
 }
 
-export function StationBoard({ line, departures, stationIndex, vehicles, now, onClose }: Props) {
+/** The "following trains" list from a Metro platform display, in the line's colour. */
+export function StationBoard({ line, stationName, departures, stationIndex, vehicles, now, onClose }: Props) {
   // Shared-line trains can terminate off our line, in which case the destination is already a name.
   const name = (id: string | null) => line.stations.find((s) => s.id === id)?.name ?? id ?? "";
   const upcoming = (departures ?? []).filter((d) => stillDue(d, stationIndex, vehicles, now)).slice(0, 4);
 
   return (
-    <div className="pid" role="dialog" aria-label="Next trains" style={{ borderTopColor: line.colour }}>
+    <div className="pid" role="dialog" aria-label={`Next trains from ${stationName}`} style={{ borderTopColor: line.colour }}>
       <button className="pid-close" onClick={onClose} aria-label="Close">
         ×
       </button>
+      <h2 className="pid-station">{stationName}</h2>
       {departures === undefined ? (
         <p className="pid-empty">Loading…</p>
       ) : upcoming.length === 0 ? (

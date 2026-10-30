@@ -18,6 +18,8 @@ interface Props {
   closedStretches: { from: string; to: string }[];
   now: number;
   selected: string | null;
+  /** The station nearest the device, when the viewer has asked for it. */
+  nearest: string | null;
   onSelect: (stationId: string) => void;
   /** Shown beside the selected station's name. */
   board: ReactNode;
@@ -30,7 +32,7 @@ const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor:
   r: { dx: 14, dy: 5, anchor: "start" },
 };
 
-export function LineMap({ line, vehicles, departures, closedStretches, now, selected, onSelect, board }: Props) {
+export function LineMap({ line, vehicles, departures, closedStretches, now, selected, nearest, onSelect, board }: Props) {
   const { width, height } = line.schematic;
   const stations = line.stations;
   const last = stations[stations.length - 1];
@@ -57,6 +59,13 @@ export function LineMap({ line, vehicles, departures, closedStretches, now, sele
     <div className="map-scroll" ref={scroller}>
       <div className="line-map" style={{ width, height: height + BOARD_ROOM }}>
         <svg width={width} height={height} role="img" aria-label={`${line.name} line map`}>
+          <defs>
+            {/* Paints a box behind a station name, for hover and focus. */}
+            <filter id="label-bg" x="-0.06" y="-0.12" width="1.12" height="1.24">
+              <feFlood className="label-bg" />
+              <feComposite in="SourceGraphic" operator="over" />
+            </filter>
+          </defs>
           {line.schematic.loopClosure && (
             <polyline points={line.schematic.loopClosure.join(" ")} fill="none" stroke={line.colour} strokeWidth={8} strokeLinejoin="round" />
           )}
@@ -78,15 +87,18 @@ export function LineMap({ line, vehicles, departures, closedStretches, now, sele
             return (
               <g
                 key={s.id}
-                className={`station${selected === s.id ? " selected" : ""}`}
+                className={`station${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
                 onClick={() => onSelect(s.id)}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
                 role="button"
                 tabIndex={0}
-                aria-label={s.name}
+                aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
+                aria-pressed={selected === s.id}
+                style={{ ["--line" as string]: line.colour }}
               >
-                <circle cx={s.x} cy={s.y} r={14} fill="transparent" />
-                <circle cx={s.x} cy={s.y} r={6} fill="var(--bg)" stroke={line.colour} strokeWidth={3} />
+                <circle className="station-hit" cx={s.x} cy={s.y} r={14} />
+                {nearest === s.id && <circle className="station-here" cx={s.x} cy={s.y} r={12} />}
+                <circle className="station-dot" cx={s.x} cy={s.y} r={6} stroke={line.colour} strokeWidth={3} />
                 <text x={s.x + l.dx} y={s.y + l.dy} textAnchor={l.anchor}>
                   {s.name}
                 </text>
