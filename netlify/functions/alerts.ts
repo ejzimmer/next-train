@@ -1,16 +1,21 @@
 import type { Config } from "@netlify/functions";
-import { fetchFeed } from "../../shared/feed";
+import { fetchFeed, toNum } from "../../shared/feed";
 import { buildAlerts } from "../../shared/alerts";
-import { apiKey, CACHE_HEADERS, errorResponse, lineFromRequest } from "../../shared/http";
+import { lines } from "../../shared/lines";
+import { apiKey, CACHE_HEADERS, errorResponse } from "../../shared/http";
+import type { NetworkAlertsResponse } from "../../shared/types";
 
-export default async (req: Request) => {
-  const line = lineFromRequest(req);
-  if (!line) return errorResponse(404, "Unknown line");
+export default async () => {
   try {
     const feed = await fetchFeed("metro", "service-alerts", apiKey());
-    return new Response(JSON.stringify(buildAlerts(feed, line.config, line.data, Date.now() / 1000)), {
-      headers: CACHE_HEADERS,
-    });
+    const now = Date.now() / 1000;
+    const body: NetworkAlertsResponse = {
+      feedTimestamp: toNum(feed.header.timestamp),
+      lines: Object.fromEntries(
+        Object.values(lines).map(({ config, data }) => [config.id, buildAlerts(feed, config, data, now).alerts]),
+      ),
+    };
+    return new Response(JSON.stringify(body), { headers: CACHE_HEADERS });
   } catch (e) {
     return errorResponse(502, String(e));
   }

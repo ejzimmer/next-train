@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import hurstbridge from "../lines/hurstbridge.json";
-import stationData from "../data/hurstbridge.stations.json";
-import type { AlertsResponse, DeparturesResponse, LineConfig, VehiclesResponse } from "../shared/types";
+import stationData from "../data/stations.json";
+import { LINES } from "../shared/network";
+import type { AlertDto, NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
 import { LineMap } from "./LineMap";
+import { LineSwitches } from "./LineSwitches";
 import { Loading } from "./Loading";
 import { StationBoard } from "./StationBoard";
 import { useNearestStation } from "./useNearestStation";
 import { useNow, usePoll } from "./usePoll";
 
-const line = hurstbridge as LineConfig;
 /** About three times a minute; the API allows 24 calls a minute per feed. */
 const POLL_MS = 20_000;
 const ALERTS_POLL_MS = 2 * 60_000;
@@ -21,6 +21,17 @@ function stationFromUrl() {
 /** Where each station is, for finding the nearest one. */
 const PLACES = stationData.stations as Record<string, { lat: number; lon: number }>;
 const NEAREST_KEY = "showNearest";
+const LINES_KEY = "lines";
+
+function savedLines(): string[] {
+  try {
+    const ids = JSON.parse(localStorage.getItem(LINES_KEY) ?? "null");
+    if (Array.isArray(ids)) return ids.filter((id) => LINES.some((l) => l.id === id));
+  } catch {
+    // Fall through to the default.
+  }
+  return ["hurstbridge"];
+}
 
 function savedShowNearest() {
   try {
@@ -39,11 +50,46 @@ function showStation(id: string | null) {
 
 export function App() {
   const [selected, setSelected] = useState<string | null>(stationFromUrl);
-  const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?line=${line.id}`, POLL_MS);
-  const departures = usePoll<DeparturesResponse>(`/api/departures?line=${line.id}`, POLL_MS);
-  const alerts = usePoll<AlertsResponse>(`/api/alerts?line=${line.id}`, ALERTS_POLL_MS);
+  const [lineIds, setLineIds] = useState(savedLines);
+  const lines = useMemo(() => LINES.filter((l) => lineIds.includes(l.id)), [lineIds]);
+  const toggleLine = (id: string) => {
+    const next = lineIds.includes(id) ? lineIds.filter((x) => x !== id) : [...lineIds, id];
+    setLineIds(next);
+    try {
+      localStorage.setItem(LINES_KEY, JSON.stringify(next));
+    } catch {
+      // Not remembered; fine.
+    }
+  };
+  const onMap = useMemo(() => new Set(lines.flatMap((l) => l.stations.map((s) => s.id))), [lines]);
+  const station = selected && onMap.has(selected) ? selected : null;
+
+  const vehicles = usePoll<VehiclesResponse>("/api/vehicles", POLL_MS);
+  const departures = usePoll<StationDeparturesResponse>(station && `/api/departures?station=${station}`, POLL_MS);
+  const alerts = usePoll<NetworkAlertsResponse>("/api/alerts", ALERTS_POLL_MS);
   const now = useNow(10_000);
   const hasStations = Object.keys(stationData.stations).length > 0;
+  const shownVehicles = useMemo(
+    () => (vehicles.data?.vehicles ?? []).filter((v) => lineIds.includes(v.line)),
+    [vehicles.data, lineIds],
+  );
+  const shownDepartures = departures.data?.departures.filter((d) => lineIds.includes(d.line));
+  // The same works are posted against each line they affect: show them once.
+  const shownAlerts = useMemo(() => {
+    const seen = new Map<string, AlertDto>();
+    for (const l of lines)
+      for (const a of alerts.data?.lines[l.id] ?? []) {
+        const key = `${a.header}\n${a.description}`;
+        if (!seen.has(key)) seen.set(key, a);
+      }
+    return [...seen.values()].sort((x, y) => (x.start ?? 0) - (y.start ?? 0));
+  }, [alerts.data, lines]);
+  const closedStretches = lines.flatMap((l) =>
+    (alerts.data?.lines[l.id] ?? [])
+      .filter((a) => a.stretch && (!a.start || a.start <= now))
+      .map((a) => ({ line: l.id, ...a.stretch! })),
+  );
+  const places = useMemo(() => Object.fromEntries([...onMap].map((id) => [id, PLACES[id]])), [onMap]);
 
   const select = useCallback((id: string | null) => {
     setSelected((current) => {
@@ -54,7 +100,7 @@ export function App() {
   }, []);
 
   const [showNearest, setShowNearest] = useState(savedShowNearest);
-  const nearest = useNearestStation(showNearest, PLACES);
+  const nearest = useNearestStation(showNearest, places);
   const nearestId = nearest.status === "found" ? nearest.id : null;
   const toggleNearest = (on: boolean) => {
     setShowNearest(on);
@@ -87,7 +133,7 @@ export function App() {
   return (
     <div className="app">
       <header className="top">
-        <h1>{line.name} line</h1>
+        <h1>{lines.length === 1 ? `${lines[0].name} line` : "Metro trains"}</h1>
         <p className="muted">
           {vehicles.error ? "Live data unavailable, retrying" : updated ? `Updated ${updated}` : "Loading live data…"}
         </p>
@@ -101,32 +147,30 @@ export function App() {
             {nearestText(nearest)}
           </span>
         </div>
+        <LineSwitches on={lineIds} onToggle={toggleLine} />
       </header>
-      <Disruptions line={line} alerts={alerts.data?.alerts} now={now} />
+      <Disruptions alerts={shownAlerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
         {!vehicles.data && !vehicles.error ? (
           <Loading />
         ) : (
           <LineMap
-            line={line}
-            vehicles={vehicles.data?.vehicles ?? []}
-            departures={departures.data?.stations}
-            closedStretches={(alerts.data?.alerts ?? [])
-              .filter((a) => a.stretch && (!a.start || a.start <= now))
-              .map((a) => a.stretch!)}
+            lines={lines}
+            vehicles={shownVehicles}
+            departures={shownDepartures}
+            closedStretches={closedStretches}
             now={now}
-            selected={selected}
+            selected={station}
             nearest={nearestId}
             onSelect={select}
             board={
-              selected && (
+              station && (
                 <StationBoard
-                  line={line}
-                  stationName={line.stations.find((s) => s.id === selected)?.name ?? selected}
-                  departures={departures.data?.stations[selected]}
-                  stationIndex={line.stations.findIndex((s) => s.id === selected)}
-                  vehicles={vehicles.data?.vehicles ?? []}
+                  stationId={station}
+                  colour={lines.find((l) => l.stations.some((s) => s.id === station))!.colour}
+                  departures={shownDepartures}
+                  vehicles={shownVehicles}
                   now={now}
                   onClose={() => select(null)}
                 />

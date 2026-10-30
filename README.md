@@ -1,16 +1,18 @@
-# next-train: Hurstbridge line live map
+# next-train: Metro trains live map
 
-A schematic map of the Hurstbridge line showing where each train is right now, with next departures for any
-station you click. Data comes from Transport Victoria's GTFS Realtime feeds.
+A schematic map of Melbourne's Metro train lines showing where each train is right now, with next departures for
+any station you click. Each line can be switched on and off; lines sharing track are drawn side by side, as on
+Metro's network map. Data comes from Transport Victoria's GTFS Realtime feeds.
 
 ## How it works
 
-- `netlify/functions/vehicles.ts` and `departures.ts` fetch the Metro GTFS-R feeds with the API key, decode
-  them and return small JSON for one line. Responses are cached on Netlify's CDN for 30 s, so the key never
+- `netlify/functions/vehicles.ts`, `departures.ts` and `alerts.ts` fetch the Metro GTFS-R feeds with the API key,
+  decode them and return small JSON: every line's trains and alerts, and one station's departures. Responses are cached on Netlify's CDN for 30 s, so the key never
   reaches the browser and repeat loads don't spend the API's 24 calls / minute limit.
-- `lines/hurstbridge.json` is the hand-written line config: stations in order, city end first.
-- `data/hurstbridge.*.json` is generated from the GTFS Schedule zip: station coordinates, stop IDs, platform
-  numbers and each timetabled trip's direction and destination.
+- `shared/network.ts` is the hand-written network: each line's stations in order, city end first, and where every
+  station sits on the schematic.
+- `data/stations.json` and `data/<line>.*.json` are generated from the GTFS Schedule zip: station coordinates,
+  stop IDs, platform numbers, and each timetabled trip's direction, destination and stopping times.
 - The browser polls both functions every 60 s (paused while the tab is hidden) and places each train between
   stations by snapping its GPS position onto the line.
 

@@ -1,18 +1,20 @@
 import { useEffect, useState } from "react";
 
-/** Fetches `url` every `intervalMs`, pausing while the tab is hidden. */
-export function usePoll<T>(url: string, intervalMs: number) {
+/** Fetches `url` every `intervalMs`, pausing while the tab is hidden. Nothing is fetched while `url` is null. */
+export function usePoll<T>(url: string | null, intervalMs: number) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    setData(null);
+    if (!url) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
 
     async function tick() {
       clearTimeout(timer);
       try {
-        const res = await fetch(url);
+        const res = await fetch(url!);
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as T;
         if (!cancelled) {

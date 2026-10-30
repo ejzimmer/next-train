@@ -1,11 +1,14 @@
-import type { AlertDto, LineConfig } from "../shared/types";
+import { useState } from "react";
+import { STATIONS } from "../shared/network";
+import type { AlertDto } from "../shared/types";
 import { calendarWeeks, disruptedDays } from "./calendar";
 
 interface Props {
-  line: LineConfig;
   alerts: AlertDto[] | undefined;
   now: number;
 }
+
+const COLLAPSED_KEY = "disruptionsCollapsed";
 
 const clock = new Intl.DateTimeFormat("en-AU", {
   hour: "numeric",
@@ -62,8 +65,8 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
   );
 }
 
-function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: number }) {
-  const name = (id: string) => line.stations.find((s) => s.id === id)?.name ?? id;
+function Notice({ alert, now }: { alert: AlertDto; now: number }) {
+  const name = (id: string) => STATIONS[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
@@ -99,20 +102,40 @@ function Notice({ line, alert, now }: { line: LineConfig; alert: AlertDto; now: 
   );
 }
 
-/** All the line's disruptions on one board, styled after Metro's station posters. */
-export function Disruptions({ line, alerts, now }: Props) {
+function savedCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** All the disruptions on one board, styled after Metro's station posters. The orange bar folds it away. */
+export function Disruptions({ alerts, now }: Props) {
+  const [collapsed, setCollapsed] = useState(savedCollapsed);
   if (!alerts?.length) return null;
+  const toggle = () => {
+    setCollapsed(!collapsed);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, collapsed ? "0" : "1");
+    } catch {
+      // Not remembered; fine.
+    }
+  };
   const hasNight = alerts.some((a) => [...disruptedDays(a.periods, now).values()].includes("night"));
   return (
-    <aside className="disruptions" aria-label="Disruptions">
-      <div className="disruptions-bar">
+    <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
+      <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">
         <span className="bang" aria-hidden>
           !
         </span>
-      </div>
-      <div className="disruptions-body">
+        <svg className="chevron" viewBox="0 0 24 24" aria-hidden>
+          <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <div className="disruptions-body" hidden={collapsed}>
         {alerts.map((a) => (
-          <Notice key={a.id} line={line} alert={a} now={now} />
+          <Notice key={a.id} alert={a} now={now} />
         ))}
         <ul className="cal-key">
           <li>
