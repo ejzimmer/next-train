@@ -3,10 +3,12 @@ import stationData from "../data/stations.json";
 import { LINES } from "../shared/network";
 import type { NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
-import { LineMap } from "./LineMap";
+import { HIDE_AFTER, LineMap } from "./LineMap";
 import { LineSwitches } from "./LineSwitches";
 import { Loading } from "./Loading";
 import { StationBoard } from "./StationBoard";
+import { TrainCard } from "./TrainCard";
+import { TripFinished } from "./TripFinished";
 import { useNearestStation } from "./useNearestStation";
 import { useNow, usePoll } from "./usePoll";
 
@@ -16,6 +18,11 @@ const ALERTS_POLL_MS = 2 * 60_000;
 
 function stationFromUrl() {
   return new URLSearchParams(location.search).get("station");
+}
+
+/** A shared train (?trainid=trip id): opened on its line, boarded. */
+function trainFromUrl() {
+  return new URLSearchParams(location.search).get("trainid");
 }
 
 /** Where each station is, for finding the nearest one. */
@@ -41,12 +48,14 @@ function savedShowNearest() {
   }
 }
 
-function showStation(id: string | null) {
+function setParam(name: string, value: string | null) {
   const url = new URL(location.href);
-  if (id) url.searchParams.set("station", id);
-  else url.searchParams.delete("station");
+  if (value) url.searchParams.set(name, value);
+  else url.searchParams.delete(name);
   history.replaceState(null, "", url);
 }
+
+const showStation = (id: string | null) => setParam("station", id);
 
 export function App() {
   const [selected, setSelected] = useState<string | null>(stationFromUrl);
@@ -65,6 +74,28 @@ export function App() {
   const station = selected && onMap.has(selected) ? selected : null;
 
   const vehicles = usePoll<VehiclesResponse>("/api/vehicles", POLL_MS);
+
+  // A shared train: once the trains are in, show just its line with it boarded, or say its trip has finished.
+  const [linkedTrip] = useState(trainFromUrl);
+  const [linked, setLinked] = useState<"waiting" | "found" | "finished" | null>(linkedTrip ? "waiting" : null);
+  const [boarded, setBoarded] = useState<string | null>(null);
+  useEffect(() => {
+    if (linked !== "waiting" || !vehicles.data) return;
+    // A train the map would leave off (not heard from for a while) counts as finished too.
+    const v = vehicles.data.vehicles.find(
+      (x) => x.tripId === linkedTrip && Date.now() / 1000 - x.timestamp <= HIDE_AFTER,
+    );
+    if (!v) return setLinked("finished");
+    setLineIds([v.line]);
+    setBoarded(v.tripId);
+    setLinked("found");
+  }, [linked, linkedTrip, vehicles.data]);
+  const board = (tripId: string | null) => {
+    setBoarded(tripId);
+    if (!tripId) setParam("trainid", null);
+  };
+
+  const [selectedTrain, setSelectedTrain] = useState<string | null>(null);
   const departures = usePoll<StationDeparturesResponse>(station && `/api/departures?station=${station}`, POLL_MS);
   const alerts = usePoll<NetworkAlertsResponse>("/api/alerts", ALERTS_POLL_MS);
   const now = useNow(10_000);
@@ -90,6 +121,7 @@ export function App() {
   const places = useMemo(() => Object.fromEntries([...onMap].map((id) => [id, PLACES[id]])), [onMap]);
 
   const select = useCallback((id: string | null) => {
+    setSelectedTrain(null);
     setSelected((current) => {
       const next = current === id ? null : id;
       showStation(next);
@@ -116,7 +148,11 @@ export function App() {
   }, [nearestId]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && select(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      select(null);
+      setSelectedTrain(null);
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [select]);
@@ -128,6 +164,15 @@ export function App() {
     const secs = Math.round(now - ts);
     return secs < 60 ? null : `Updated ${Math.round(secs / 60)} min ago`;
   }, [vehicles.data, now]);
+
+  const selectTrain = (tripId: string) => {
+    setSelected(null);
+    showStation(null);
+    setSelectedTrain((current) => (current === tripId ? null : tripId));
+  };
+  const cardVehicle = shownVehicles.find((v) => v.tripId === selectedTrain);
+
+  if (linked === "finished") return <TripFinished />;
 
   return (
     <div className="app">
@@ -160,7 +205,7 @@ export function App() {
       <Disruptions alerts={shownAlerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
-        {!vehicles.data && !vehicles.error ? (
+        {!vehicles.error && (!vehicles.data || linked === "waiting") ? (
           <Loading />
         ) : (
           <LineMap
@@ -172,8 +217,23 @@ export function App() {
             selected={station}
             nearest={nearestId}
             onSelect={select}
+            selectedTrain={cardVehicle ? selectedTrain : null}
+            onSelectTrain={selectTrain}
+            boarded={boarded}
+            reveal={linked === "found" ? linkedTrip : null}
             board={
-              station && (
+              cardVehicle ? (
+                <TrainCard
+                  key={cardVehicle.tripId}
+                  vehicle={cardVehicle}
+                  destination={cardVehicle.destination}
+                  now={now}
+                  pollMs={POLL_MS}
+                  boarded={boarded === cardVehicle.tripId}
+                  onBoard={(on) => board(on ? cardVehicle.tripId : null)}
+                  onClose={() => setSelectedTrain(null)}
+                />
+              ) : station && (
                 <StationBoard
                   stationId={station}
                   colour={lines.find((l) => l.stations.some((s) => s.id === station))!.colour}

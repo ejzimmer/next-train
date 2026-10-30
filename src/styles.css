@@ -170,3 +170,57 @@ footer { margin-top: 24px; }
   .xt { animation: none; left: 50%; transform: translateX(-50%); }
   .xt-wheel { animation: none; }
 }
+
+/* A train's card, and the circle round the train the viewer has boarded. */
+.train { cursor: pointer; }
+.train:focus { outline: none; }
+.train-hit { fill: transparent; stroke: none; }
+.boarded { fill: none; stroke: var(--fg); stroke-width: 4; }
+.train-card-buttons { display: flex; justify-content: center; gap: 8px; margin: 28px 0 6px; }
+.card-button {
+  font: inherit; font-size: 0.9rem; font-weight: 700; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+  border: none; background: transparent; color: #111;
+}
+.card-button:hover { background: #e3e6ea; }
+/* Board/Detrain, in the train's line colour. */
+.card-button.primary { background: var(--line); color: #fff; }
+.card-button.primary:hover { filter: brightness(0.9); }
+.card-button:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
+.share { position: relative; display: inline-flex; align-items: center; }
+/* Beside Share, without moving the buttons. */
+.copied {
+  position: absolute; left: calc(100% + 6px); padding: 2px 8px; border-radius: 10px; background: #111; color: #fff; font-size: 0.75rem;
+}
+
+/* "Trip finished": the train parked in a yard. */
+.yard-scene { max-width: calc(100% - 32px); height: auto; margin: 0 auto; display: block; }
+.yard .xt-wheel { animation: none; }
+.yard-rail { stroke: var(--muted); stroke-width: 3; }
+.yard-sleeper { fill: var(--muted); opacity: 0.5; }
+.yard-buffer { fill: none; stroke: #c0392b; stroke-width: 4; }
+.yard-buffer-beam { fill: #ffd400; }
+.yard-pole { stroke: var(--muted); stroke-width: 4; }
+.yard-lamp { fill: #fffbe0; stroke: var(--muted); stroke-width: 2; }
+.yard-text { font-size: 1.4rem; font-weight: 800; margin: 16px 0 0; }
+.train-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 4px; }
+.cars { position: relative; }
+.type-button {
+  font: inherit; font-size: 0.9rem; padding: 1px 6px; margin-left: -6px; border: none; border-radius: 4px;
+  background: transparent; color: #111; cursor: pointer;
+}
+.type-button:hover, .type-button[aria-expanded="true"] { background: #e3e6ea; }
+.type-button:focus-visible { outline: 2px solid #0072ce; }
+.cars-pop {
+  position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%); z-index: 1;
+  padding: 3px 8px; border-radius: 4px;
+  background: #111; color: #fff; font-size: 0.8rem; white-space: nowrap;
+}
+.next-stop {
+  width: 100%; font: inherit; color: inherit; text-align: left; background: transparent; cursor: pointer;
+  border-top: none; border-right: none;
+}
+.next-stop:hover:enabled { background: #e3e6ea; }
+.next-stop:focus-visible { outline: 2px solid #0072ce; outline-offset: -2px; }
+.next-stop:disabled { cursor: default; }
+.stop-row { display: flex; align-items: center; gap: 12px; padding: 3px 0 3px 14px; font-size: 0.9rem; }
+.stop-row .pid-dest { font-weight: 600; }

@@ -21,7 +21,7 @@ const clock = new Intl.DateTimeFormat("en-AU", {
 });
 
 /** "2:52 pm" → "2:52pm", as the platform displays write it. */
-const formatTime = (unix: number) => clock.format(unix * 1000).replace(/\s/g, "").toLowerCase();
+export const formatTime = (unix: number) => clock.format(unix * 1000).replace(/\s/g, "").toLowerCase();
 
 function minutes(time: number, now: number) {
   const mins = Math.floor((time - now) / 60);

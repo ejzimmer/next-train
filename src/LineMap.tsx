@@ -5,7 +5,8 @@ import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
 import { useStopped } from "./useStopped";
 
 const STALE_AFTER = 3 * 60;
-const HIDE_AFTER = 10 * 60;
+/** Trains not heard from for this long are left off the map. */
+export const HIDE_AFTER = 10 * 60;
 const BOARD_WIDTH = 380;
 /** A guess at a board's height until it's been drawn and can be measured. */
 const BOARD_HEIGHT = 300;
@@ -32,7 +33,14 @@ interface Props {
   /** The station nearest the device, when the viewer has asked for it. */
   nearest: string | null;
   onSelect: (stationId: string) => void;
-  /** Shown beside the selected station's name. */
+  /** The trip whose card is open, shown beside its train instead of a station's board. */
+  selectedTrain: string | null;
+  onSelectTrain: (tripId: string) => void;
+  /** The trip the viewer has boarded, circled. */
+  boarded: string | null;
+  /** A trip to bring into view once it's drawn (a shared train's). */
+  reveal: string | null;
+  /** Shown beside the selected station's name, or the selected train. */
   board: ReactNode;
 }
 
@@ -78,6 +86,10 @@ export function LineMap({
   selected,
   nearest,
   onSelect,
+  selectedTrain,
+  onSelectTrain,
+  boarded,
+  reveal,
   board,
 }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -260,7 +272,7 @@ export function LineMap({
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, [selected]);
+  }, [selected, selectedTrain]);
 
   // Room either side of the map when it's narrower than the window; the board can sit there too.
   const [side, setSide] = useState(0);
@@ -277,11 +289,19 @@ export function LineMap({
     return () => observer.disconnect();
   }, [width]);
 
-  const sel = stations.find((s) => s.id === selected);
-  const selAt = sel && {
-    x: ((sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x) * scale,
-    y: ((sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y) * scale,
+  const trainPoint = (v: VehicleDto) => {
+    const pts = geometry.get(v.line)?.segments[v.segment];
+    return pts && now - v.timestamp <= HIDE_AFTER ? pointAlong(pts, v.fraction) : null;
   };
+  const sel = stations.find((s) => s.id === selected);
+  const selTrain = vehicles.find((v) => v.tripId === selectedTrain);
+  const selTrainAt = selTrain && trainPoint(selTrain);
+  const selAt = selTrainAt
+    ? { x: (selTrainAt.x - box.x) * scale, y: (selTrainAt.y - box.y) * scale }
+    : sel && {
+        x: ((sel.ends[0][0] + sel.ends[1][0]) / 2 - box.x) * scale,
+        y: ((sel.ends[0][1] + sel.ends[1][1]) / 2 - box.y) * scale,
+      };
   const boardPos = useMemo(
     () =>
       selAt &&
@@ -307,16 +327,26 @@ export function LineMap({
     LINES.some((o) => o.stations[o.stations.length - 1].id === line.stations[0].id) &&
     !lines.some((o) => o !== line && o.stations.some((s) => s.id === line.stations[0].id));
 
-  // On narrow screens the map scrolls sideways: bring the selected station into view.
+  // On narrow screens the map scrolls sideways: bring the selected station or train into view.
   useEffect(() => {
     const el = scroller.current;
-    if (!el || !sel || !selAt) return;
+    if (!el || !selAt) return;
     const { left } = boardPos!;
     const from = Math.min(selAt.x, left) - 16;
     const to = Math.max(selAt.x, left + BOARD_WIDTH) + 16;
     if (from < el.scrollLeft || to > el.scrollLeft + el.clientWidth) el.scrollTo({ left: from, behavior: "smooth" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, box.width]);
+  }, [selected, selectedTrain, box.width]);
+
+  // Bring a shared train into view, once.
+  const revealed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!reveal || revealed.current === reveal) return;
+    const el = scroller.current?.querySelector(`[data-trip="${CSS.escape(reveal)}"]`);
+    if (!el) return;
+    revealed.current = reveal;
+    el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+  });
 
   return (
     <div className="map-scroll" ref={scroller}>
@@ -419,19 +449,26 @@ export function LineMap({
             );
           })}
           {vehicles.map((v) => {
-            const geo = geometry.get(v.line);
             const age = now - v.timestamp;
-            const pts = geo?.segments[v.segment];
-            if (!pts || age > HIDE_AFTER) return null;
-            const p = pointAlong(pts, v.fraction);
+            const p = trainPoint(v);
+            if (!p) return null;
             const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
             const dest = destinationOf(v);
+            const select = () => onSelectTrain(v.tripId);
             return (
               <g
                 key={v.id}
-                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}`}
+                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
+                onClick={select}
+                onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && select()}
+                role="button"
+                tabIndex={0}
+                aria-pressed={selectedTrain === v.tripId}
+                data-trip={v.tripId}
               >
+                <circle className="train-hit" r={18} />
+                {boarded === v.tripId && <circle className="boarded" r={20} />}
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
                 {v.direction ? <path d={ARROW} /> : <circle r={6} />}
                 <title>

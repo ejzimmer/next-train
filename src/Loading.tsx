@@ -4,7 +4,7 @@ const CAR = 104;
  * One cartoon X'Trapolis 100 car in Metro livery. Driving cars (`cab`) have the yellow cab on the right;
  * pass `flip` to put it on the left.
  */
-function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
+export function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
   const body = cab ? "M0,8 H88 Q97,8 99,15 L101,45 Q101,48 98,48 H0 Z" : "M0,8 H104 V48 H0 Z";
   const end = cab ? 88 : CAR;
   return (
@@ -51,7 +51,7 @@ function Car({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
 }
 
 /** A three-car set: a driving car at each end with a trailer between. */
-function Set({ x }: { x: number }) {
+export function Set({ x }: { x: number }) {
   return (
     <>
       <Car x={x} cab flip />
@@ -64,14 +64,29 @@ function Set({ x }: { x: number }) {
 const SET = 3 * CAR + 6;
 const WIDTH = 2 * SET + 4;
 
+/** How wide a train of `cars` cars is drawn. */
+export const trainWidth = (cars: number) =>
+  cars % 3 === 0 ? (cars / 3) * (SET + 4) - 4 : cars * (CAR + 3) - 3;
+
+/** A train of `cars` cars: three-car sets coupled together, or one unit with a driving car at each end. */
+export function Train({ cars }: { cars: number }) {
+  if (cars % 3 === 0) return <>{Array.from({ length: cars / 3 }, (_, i) => <Set key={i} x={i * (SET + 4)} />)}</>;
+  return (
+    <>
+      {Array.from({ length: cars }, (_, i) => (
+        <Car key={i} x={i * (CAR + 3)} cab={i === 0 || i === cars - 1} flip={i === 0} />
+      ))}
+    </>
+  );
+}
+
 /** Shown until the first train positions arrive: a cartoon six-car X'Trapolis running across the screen. */
 export function Loading() {
   return (
     <div className="loading" role="status" aria-label="Loading trains">
       <div className="loading-track">
         <svg className="xt" viewBox={`0 0 ${WIDTH} 58`} width={WIDTH} height={58} aria-hidden>
-          <Set x={0} />
-          <Set x={SET + 4} />
+          <Train cars={6} />
         </svg>
       </div>
       <p className="muted">Finding trains…</p>

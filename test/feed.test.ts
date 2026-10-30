@@ -9,6 +9,7 @@ import { calendarWeeks, disruptedDays } from "../src/calendar";
 import { isLineRoute, progress } from "../shared/routes";
 import { directionFromBearing, placeOnLine } from "../shared/position";
 import { buildVehicles } from "../shared/vehicles";
+import { buildTrip, viaLoop } from "../shared/trip";
 import { trainType } from "../shared/trainType";
 import type { LineConfig, LineData, LineTimes } from "../shared/types";
 
@@ -265,5 +266,57 @@ describe("withScheduledGaps", () => {
   it("leaves trips without a timetable alone", () => {
     const updates = [StopTimeUpdate.create({ stopSequence: 2, stopId: "s2", departure: { time: 1300 } })];
     expect(withScheduledGaps(updates, times, "other")).toBe(updates);
+  });
+});
+
+describe("viaLoop", () => {
+  const hurstbridge = lines.hurstbridge.config;
+  it("tells Loop trains from direct ones", () => {
+    expect(viaLoop(["parliament", "melbourne-central", "flagstaff", "southern-cross", "flinders-street"], hurstbridge)).toBe(true);
+    expect(viaLoop(["clifton-hill", "jolimont", "flinders-street"], hurstbridge)).toBe(false);
+  });
+  it("can't tell from Flinders Street alone", () => {
+    expect(viaLoop(["flinders-street"], hurstbridge)).toBeNull();
+  });
+});
+
+describe("buildTrip", () => {
+  const { FeedMessage } = GtfsRealtimeBindings.transit_realtime;
+  // Starts at A at 22:00 on 17 October 2026 (Melbourne, UTC+11), due at B 4 minutes later.
+  const start = Date.UTC(2026, 9, 17, 11) / 1000;
+  const tripTimes: LineTimes = { patterns: [[[1, "15327", 0], [2, "15331", 240], [3, "15335", 480]]], trips: { t: [0, 22 * 3600] } };
+  const feed = FeedMessage.create({
+    header: { gtfsRealtimeVersion: "2.0" },
+    entity: [
+      {
+        id: "t",
+        tripUpdate: {
+          trip: { tripId: "t", startDate: "20261017" },
+          stopTimeUpdate: [
+            { stopSequence: 1, stopId: "15327", departure: { time: start + 60 } },
+            { stopSequence: 2, stopId: "15331", departure: { time: start + 240 + 180 } },
+            { stopSequence: 3, stopId: "15335", arrival: { time: start + 480 + 180 } },
+          ],
+        },
+      },
+    ],
+  });
+  const trip = () =>
+    buildTrip(feed, "t", line, { ...data, times: tripTimes, trips: { t: { dir: "outbound", dest: "c" } } }, new Set(["a"]), start + 300);
+
+  it("lists the stops still to come, with how late it is at the next", () => {
+    expect(trip()).toEqual({
+      tripId: "t",
+      destination: "c",
+      viaLoop: null,
+      delay: 180,
+      stops: [
+        { station: "b", time: start + 420, platform: null },
+        { station: "c", time: start + 660, platform: null },
+      ],
+    });
+  });
+  it("is null for a trip that isn't in the feed", () => {
+    expect(buildTrip(feed, "gone", line, data, new Set(), start)).toBeNull();
   });
 });
