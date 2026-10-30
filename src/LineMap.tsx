@@ -5,7 +5,8 @@ import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
 import { useStopped } from "./useStopped";
 
 const STALE_AFTER = 3 * 60;
-const HIDE_AFTER = 10 * 60;
+/** Trains not heard from for this long are left off the map. */
+export const HIDE_AFTER = 10 * 60;
 const BOARD_WIDTH = 380;
 /** A guess at a board's height until it's been drawn and can be measured. */
 const BOARD_HEIGHT = 300;
@@ -37,6 +38,8 @@ interface Props {
   onSelectTrain: (tripId: string) => void;
   /** The trip the viewer has boarded, circled. */
   boarded: string | null;
+  /** A trip to bring into view once it's drawn (a shared train's). */
+  reveal: string | null;
   /** Shown beside the selected station's name, or the selected train. */
   board: ReactNode;
 }
@@ -86,6 +89,7 @@ export function LineMap({
   selectedTrain,
   onSelectTrain,
   boarded,
+  reveal,
   board,
 }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -334,14 +338,14 @@ export function LineMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected, selectedTrain, box.width]);
 
-  // Once on boarding (or opening a shared train), bring the boarded train into view.
-  const ring = useRef<SVGCircleElement>(null);
-  const shownBoarded = useRef<string | null>(null);
+  // Bring a shared train into view, once.
+  const revealed = useRef<string | null>(null);
   useEffect(() => {
-    if (!boarded) shownBoarded.current = null;
-    if (!boarded || shownBoarded.current === boarded || !ring.current) return;
-    shownBoarded.current = boarded;
-    ring.current.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
+    if (!reveal || revealed.current === reveal) return;
+    const el = scroller.current?.querySelector(`[data-trip="${CSS.escape(reveal)}"]`);
+    if (!el) return;
+    revealed.current = reveal;
+    el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" });
   });
 
   return (
@@ -461,9 +465,10 @@ export function LineMap({
                 role="button"
                 tabIndex={0}
                 aria-pressed={selectedTrain === v.tripId}
+                data-trip={v.tripId}
               >
                 <circle className="train-hit" r={18} />
-                {boarded === v.tripId && <circle ref={ring} className="boarded" r={20} />}
+                {boarded === v.tripId && <circle className="boarded" r={20} />}
                 {/* Arrow pointing the way the train is heading; a plain dot when unknown. */}
                 {v.direction ? <path d={ARROW} /> : <circle r={6} />}
                 <title>

@@ -3,7 +3,7 @@ import stationData from "../data/stations.json";
 import { LINES } from "../shared/network";
 import type { NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
-import { LineMap } from "./LineMap";
+import { HIDE_AFTER, LineMap } from "./LineMap";
 import { LineSwitches } from "./LineSwitches";
 import { Loading } from "./Loading";
 import { StationBoard } from "./StationBoard";
@@ -81,7 +81,10 @@ export function App() {
   const [boarded, setBoarded] = useState<string | null>(null);
   useEffect(() => {
     if (linked !== "waiting" || !vehicles.data) return;
-    const v = vehicles.data.vehicles.find((x) => x.tripId === linkedTrip);
+    // A train the map would leave off (not heard from for a while) counts as finished too.
+    const v = vehicles.data.vehicles.find(
+      (x) => x.tripId === linkedTrip && Date.now() / 1000 - x.timestamp <= HIDE_AFTER,
+    );
     if (!v) return setLinked("finished");
     setLineIds([v.line]);
     setBoarded(v.tripId);
@@ -202,7 +205,7 @@ export function App() {
       <Disruptions alerts={shownAlerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
       <main>
-        {(!vehicles.data && !vehicles.error) || linked === "waiting" ? (
+        {!vehicles.error && (!vehicles.data || linked === "waiting") ? (
           <Loading />
         ) : (
           <LineMap
@@ -217,9 +220,11 @@ export function App() {
             selectedTrain={cardVehicle ? selectedTrain : null}
             onSelectTrain={selectTrain}
             boarded={boarded}
+            reveal={linked === "found" ? linkedTrip : null}
             board={
               cardVehicle ? (
                 <TrainCard
+                  key={cardVehicle.tripId}
                   vehicle={cardVehicle}
                   destination={cardVehicle.destination}
                   now={now}

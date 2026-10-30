@@ -33,8 +33,7 @@ export function buildTrip(
 ): TripDto | null {
   const tu = feed.entity.find((e) => e.tripUpdate?.trip?.tripId === tripId)?.tripUpdate;
   if (!tu) return null;
-  const stationOf = new Map<string, string>();
-  for (const [id, s] of Object.entries(data.stations)) s.stopIds.forEach((stop) => stationOf.set(stop, id));
+  const stationOf = stationsByStop(data);
 
   // Scheduled times by stop_sequence, for how late the train is.
   const timed = data.times?.trips[tripId];
@@ -69,17 +68,27 @@ export function buildTrip(
   };
 }
 
+/** Station id by GTFS stop id; every line shares one stations table, so it's worked out once. */
+const byStop = new WeakMap<LineData["stations"], Map<string, string>>();
+function stationsByStop(data: LineData) {
+  let map = byStop.get(data.stations);
+  if (!map) {
+    map = new Map();
+    for (const [id, s] of Object.entries(data.stations)) for (const stop of s.stopIds) map.set(stop, id);
+    byStop.set(data.stations, map);
+  }
+  return map;
+}
+
+const melbourneHour = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", hour: "numeric", hourCycle: "h23" });
+
 /** Unix seconds at noon minus 12 hours, Melbourne time, on a GTFS service date (YYYYMMDD): what GTFS times count from. */
 function serviceMidnight(date: string | null | undefined): number | null {
   const m = date?.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (!m) return null;
   const noonUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], 12);
   // Melbourne's offset at noon that day, from how the date reads there.
-  const parts = new Intl.DateTimeFormat("en-AU", {
-    timeZone: "Australia/Melbourne",
-    hour: "numeric",
-    hourCycle: "h23",
-  }).formatToParts(noonUtc);
+  const parts = melbourneHour.formatToParts(noonUtc);
   const hour = Number(parts.find((p) => p.type === "hour")!.value);
   const offset = (((hour - 12) % 24) + 24) % 24;
   return noonUtc / 1000 - (offset + 12) * 3600;
