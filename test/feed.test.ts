@@ -20,12 +20,14 @@ const tripsFeed = decodeFeed(readFileSync(new URL("./fixtures/trip-updates.pb", 
 // A made-up three-station line around Ivanhoe, city end first.
 const line: LineConfig = {
   id: "test",
+  city: "melbourne",
   mode: "metro-train",
   name: "Test",
+  switchId: "test",
   colour: "#BE1014",
   textColour: "#FFFFFF",
   group: "clifton-hill",
-  routeIdMatch: "-HBE:",
+  routeIdMatch: ["-HBE:"],
   platformStations: ["a"],
   track: [],
   stations: [

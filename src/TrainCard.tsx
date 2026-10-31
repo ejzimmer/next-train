@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { LINE_BY_ID, STATIONS } from "../shared/network";
-import type { TripDto, VehicleDto } from "../shared/types";
+import type { City, TripDto, VehicleDto } from "../shared/types";
+import { useNetwork } from "./networks";
 import { formatTime } from "./StationBoard";
 import { usePoll } from "./usePoll";
 
@@ -14,7 +14,9 @@ interface Props {
   onClose: () => void;
 }
 
-export const shareUrl = (tripId: string) => `https://next-train.ez.codes?trainid=${encodeURIComponent(tripId)}`;
+/** Melbourne's links leave the city out, as they did before there were others. */
+export const shareUrl = (tripId: string, city: City) =>
+  `https://next-train.ez.codes?trainid=${encodeURIComponent(tripId)}${city === "melbourne" ? "" : `&city=${city}`}`;
 
 function delayText(delay: number) {
   const mins = Math.round(Math.abs(delay) / 60);
@@ -27,10 +29,11 @@ function ago(secs: number) {
 
 /** Details of one train, with buttons to board it (circle it on the map) and share it. */
 export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard, onClose }: Props) {
-  const line = LINE_BY_ID[vehicle.line];
-  const name = (id: string | null) => STATIONS[id ?? ""]?.name ?? id ?? "";
+  const { city, lineById, stations } = useNetwork();
+  const line = lineById[vehicle.line];
+  const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const trip = usePoll<TripDto>(
-    `/api/trip?id=${encodeURIComponent(vehicle.tripId)}&line=${encodeURIComponent(vehicle.line)}`,
+    `/api/trip?id=${encodeURIComponent(vehicle.tripId)}&line=${encodeURIComponent(vehicle.line)}&city=${city}`,
     pollMs,
   ).data;
   const dest = trip?.destination ?? destination;
@@ -46,7 +49,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
   }, [copied]);
   const share = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl(vehicle.tripId));
+      await navigator.clipboard.writeText(shareUrl(vehicle.tripId, city));
       setCopied(true);
     } catch {
       // No clipboard (e.g. an insecure page); nothing to show.
@@ -61,10 +64,15 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
       <h2 className="pid-station">{dest ? name(dest) + via : line?.name}</h2>
       <div className="train-meta">
         <span className="cars">
-          <button className="type-button" aria-expanded={showCars} onClick={() => setShowCars(!showCars)}>
-            {vehicle.trainType ?? "Car numbers"}
-          </button>
-          {showCars && <span className="cars-pop">{vehicle.id.split("-").join(" ")}</span>}
+          {/* The type, with the car numbers behind it when the feed has real ones. */}
+          {vehicle.carNumbers ? (
+            <button className="type-button" aria-expanded={showCars} onClick={() => setShowCars(!showCars)}>
+              {vehicle.trainType ?? "Car numbers"}
+            </button>
+          ) : (
+            vehicle.trainType && <span className="train-type">{vehicle.trainType}</span>
+          )}
+          {showCars && vehicle.carNumbers && <span className="cars-pop">{vehicle.carNumbers.join(" ")}</span>}
         </span>
         <span className="pid-detail">Updated {ago(now - vehicle.timestamp)}</span>
       </div>

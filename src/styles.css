@@ -22,6 +22,13 @@ body { margin: 0; background: var(--bg); }
 .top h1 { margin: 0; font-size: 1.4rem; }
 .top p { margin: 4px 0 8px; }
 .top p:empty { display: none; }
+.city-tabs { display: flex; gap: 4px; margin: 0 0 8px; }
+.city-tab {
+  font: inherit; font-size: 0.95rem; font-weight: 600; padding: 4px 12px; border: none; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.city-tab:hover, .city-tab[aria-selected="true"] { background: var(--highlight); color: var(--fg); }
+.city-tab:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
 .title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .icon-button.locate { color: #9aa3ad; }
 .icon-button.locate[aria-pressed="true"] { color: #0072ce; }
@@ -161,6 +168,9 @@ footer { margin-top: 24px; }
 .xt-windows { fill: #1c2530; }
 .xt-cab { fill: #ffc20e; stroke: #4d5866; stroke-width: 1; }
 .xt-light { fill: #fffbe0; }
+.wt-body { fill: #d5dade; stroke: #4d5866; stroke-width: 1; }
+.wt-door { fill: #bcc3ca; stroke: #6b7682; stroke-width: 0.6; }
+.wt-door-gap { stroke: #6b7682; stroke-width: 0.6; }
 .xt-wheel circle { fill: #333; }
 .xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
 .xt-wheel { animation: xt-spin 0.7s linear infinite; }
@@ -210,6 +220,7 @@ footer { margin-top: 24px; }
 }
 .type-button:hover, .type-button[aria-expanded="true"] { background: #e3e6ea; }
 .type-button:focus-visible { outline: 2px solid #0072ce; }
+.train-type { font-size: 0.9rem; }
 .cars-pop {
   position: absolute; left: calc(100% + 6px); top: 50%; transform: translateY(-50%); z-index: 1;
   padding: 3px 8px; border-radius: 4px;

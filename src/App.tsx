@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import stationData from "../data/stations.json";
-import { LINES } from "../shared/network";
-import type { NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
+import type { City, NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
 import { HIDE_AFTER, LineMap } from "./LineMap";
 import { LineSwitches } from "./LineSwitches";
 import { Loading } from "./Loading";
+import { CITIES, NETWORKS, NetworkContext, type Network } from "./networks";
 import { StationBoard } from "./StationBoard";
 import { TrainCard } from "./TrainCard";
 import { TripFinished } from "./TripFinished";
@@ -25,19 +24,35 @@ function trainFromUrl() {
   return new URLSearchParams(location.search).get("trainid");
 }
 
-/** Where each station is, for finding the nearest one. */
-const PLACES = stationData.stations as Record<string, { lat: number; lon: number }>;
 const NEAREST_KEY = "showNearest";
-const LINES_KEY = "lines";
+const CITY_KEY = "city";
+/** Each city's switches that are on; Melbourne's key is from before there were other cities. */
+const linesKey = (city: City) => (city === "melbourne" ? "lines" : `lines:${city}`);
 
-function savedLines(): string[] {
+const isCity = (c: string | null): c is City => CITIES.some((n) => n.city === c);
+
+/** The city in the link (?city=), else the one last shown. */
+function startingCity(): City {
+  const fromUrl = new URLSearchParams(location.search).get("city");
+  if (isCity(fromUrl)) return fromUrl;
+  if (trainFromUrl()) return "melbourne";
   try {
-    const ids = JSON.parse(localStorage.getItem(LINES_KEY) ?? "null");
-    if (Array.isArray(ids)) return ids.filter((id) => LINES.some((l) => l.id === id));
+    const saved = localStorage.getItem(CITY_KEY);
+    if (isCity(saved)) return saved;
   } catch {
     // Fall through to the default.
   }
-  return ["hurstbridge"];
+  return "melbourne";
+}
+
+function savedSwitches(network: Network): string[] {
+  try {
+    const ids = JSON.parse(localStorage.getItem(linesKey(network.city)) ?? "null");
+    if (Array.isArray(ids)) return ids.filter((id) => network.switches.some((s) => s.id === id));
+  } catch {
+    // Fall through to the default.
+  }
+  return network.defaultSwitches;
 }
 
 function savedShowNearest() {
@@ -57,23 +72,60 @@ function setParam(name: string, value: string | null) {
 
 const showStation = (id: string | null) => setParam("station", id);
 
+/** A tab per city; each city's map starts afresh when its tab is chosen. */
 export function App() {
+  const [city, setCity] = useState(startingCity);
+  const choose = (next: City) => {
+    if (next === city) return;
+    setCity(next);
+    try {
+      localStorage.setItem(CITY_KEY, next);
+    } catch {
+      // Not remembered; fine.
+    }
+    const url = new URL(location.href);
+    for (const p of ["station", "trainid", "city"]) url.searchParams.delete(p);
+    if (next !== "melbourne") url.searchParams.set("city", next);
+    history.replaceState(null, "", url);
+  };
+  return (
+    <NetworkContext.Provider value={NETWORKS[city]}>
+      <CityMap key={city} network={NETWORKS[city]} onCity={choose} />
+    </NetworkContext.Provider>
+  );
+}
+
+function CityTabs({ city, onCity }: { city: City; onCity: (city: City) => void }) {
+  return (
+    <div className="city-tabs" role="tablist" aria-label="City">
+      {CITIES.map((n) => (
+        <button key={n.city} className="city-tab" role="tab" aria-selected={n.city === city} onClick={() => onCity(n.city)}>
+          {n.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CityMap({ network, onCity }: { network: Network; onCity: (city: City) => void }) {
+  const { city } = network;
   const [selected, setSelected] = useState<string | null>(stationFromUrl);
-  const [lineIds, setLineIds] = useState(savedLines);
-  const lines = useMemo(() => LINES.filter((l) => lineIds.includes(l.id)), [lineIds]);
+  const [lineIds, setLineIds] = useState(() => savedSwitches(network));
+  const lines = useMemo(() => network.lines.filter((l) => lineIds.includes(l.switchId)), [network, lineIds]);
   const toggleLine = (id: string) => {
     const next = lineIds.includes(id) ? lineIds.filter((x) => x !== id) : [...lineIds, id];
     setLineIds(next);
     try {
-      localStorage.setItem(LINES_KEY, JSON.stringify(next));
+      localStorage.setItem(linesKey(city), JSON.stringify(next));
     } catch {
       // Not remembered; fine.
     }
   };
+  const onLine = useMemo(() => new Set(lines.map((l) => l.id)), [lines]);
   const onMap = useMemo(() => new Set(lines.flatMap((l) => l.stations.map((s) => s.id))), [lines]);
   const station = selected && onMap.has(selected) ? selected : null;
 
-  const vehicles = usePoll<VehiclesResponse>("/api/vehicles", POLL_MS);
+  const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?city=${city}`, POLL_MS);
 
   // A shared train: once the trains are in, show just its line with it boarded, or say its trip has finished.
   const [linkedTrip] = useState(trainFromUrl);
@@ -86,39 +138,38 @@ export function App() {
       (x) => x.tripId === linkedTrip && Date.now() / 1000 - x.timestamp <= HIDE_AFTER,
     );
     if (!v) return setLinked("finished");
-    setLineIds([v.line]);
+    setLineIds([network.lineById[v.line].switchId]);
     setBoarded(v.tripId);
     setLinked("found");
-  }, [linked, linkedTrip, vehicles.data]);
+  }, [linked, linkedTrip, vehicles.data, network]);
   const board = (tripId: string | null) => {
     setBoarded(tripId);
     if (!tripId) setParam("trainid", null);
   };
 
   const [selectedTrain, setSelectedTrain] = useState<string | null>(null);
-  const departures = usePoll<StationDeparturesResponse>(station && `/api/departures?station=${station}`, POLL_MS);
-  const alerts = usePoll<NetworkAlertsResponse>("/api/alerts", ALERTS_POLL_MS);
+  const departures = usePoll<StationDeparturesResponse>(station && `/api/departures?station=${station}&city=${city}`, POLL_MS);
+  const alerts = usePoll<NetworkAlertsResponse>(`/api/alerts?city=${city}`, ALERTS_POLL_MS);
   const now = useNow(10_000);
-  const hasStations = Object.keys(stationData.stations).length > 0;
+  const hasStations = Object.keys(network.places).length > 0;
   const shownVehicles = useMemo(
-    () => (vehicles.data?.vehicles ?? []).filter((v) => lineIds.includes(v.line)),
-    [vehicles.data, lineIds],
+    () => (vehicles.data?.vehicles ?? []).filter((v) => onLine.has(v.line)),
+    [vehicles.data, onLine],
   );
-  const shownDepartures = departures.data?.departures.filter((d) => lineIds.includes(d.line));
-  // Each line's alerts; Disruptions merges the ones that read the same.
-  const shownAlerts = useMemo(
-    () =>
-      lines
-        .flatMap((l) => (alerts.data?.lines[l.id] ?? []).map((alert) => ({ alert, lines: [l] })))
-        .sort((x, y) => (x.alert.start ?? 0) - (y.alert.start ?? 0)),
-    [alerts.data, lines],
-  );
+  const shownDepartures = departures.data?.departures.filter((d) => onLine.has(d.line));
+  // Each line's alerts, with its switch; Disruptions merges the ones that read the same.
+  const shownAlerts = useMemo(() => {
+    const switchOf = (id: string) => network.switches.find((s) => s.id === id)!;
+    return lines
+      .flatMap((l) => (alerts.data?.lines[l.id] ?? []).map((alert) => ({ alert, lines: [switchOf(l.switchId)] })))
+      .sort((x, y) => (x.alert.start ?? 0) - (y.alert.start ?? 0));
+  }, [alerts.data, lines, network]);
   const closedStretches = lines.flatMap((l) =>
     (alerts.data?.lines[l.id] ?? [])
       .filter((a) => a.stretch && (!a.start || a.start <= now))
       .map((a) => ({ line: l.id, ...a.stretch! })),
   );
-  const places = useMemo(() => Object.fromEntries([...onMap].map((id) => [id, PLACES[id]])), [onMap]);
+  const places = useMemo(() => Object.fromEntries([...onMap].map((id) => [id, network.places[id]])), [onMap, network]);
 
   const select = useCallback((id: string | null) => {
     setSelectedTrain(null);
@@ -174,11 +225,13 @@ export function App() {
 
   if (linked === "finished") return <TripFinished />;
 
+  const switchesOn = network.switches.filter((s) => lineIds.includes(s.id));
   return (
     <div className="app">
       <header className="top">
+        <CityTabs city={city} onCity={onCity} />
         <div className="title-row">
-          <h1>{lines.length === 1 ? `${lines[0].name} line` : "Metro trains"}</h1>
+          <h1>{switchesOn.length === 1 ? switchesOn[0].title : network.title}</h1>
           <button
             className="icon-button locate"
             aria-pressed={showNearest}
@@ -203,7 +256,7 @@ export function App() {
         <LineSwitches on={lineIds} onToggle={toggleLine} />
       </header>
       <Disruptions alerts={shownAlerts} now={now} />
-      {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs).</p>}
+      {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs:{city}).</p>}
       <main>
         {!vehicles.error && (!vehicles.data || linked === "waiting") ? (
           <Loading />
@@ -247,10 +300,7 @@ export function App() {
           />
         )}
       </main>
-      <footer className="muted">
-        Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence.
-        Not affiliated with PTV.
-      </footer>
+      <footer className="muted">{network.attribution}</footer>
     </div>
   );
 }

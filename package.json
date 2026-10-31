@@ -7,13 +7,15 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "gtfs": "tsx scripts/build-gtfs.ts"
+    "gtfs:melbourne": "tsx scripts/build-gtfs-melbourne.ts",
+    "gtfs:sydney": "tsx scripts/build-gtfs-sydney.ts"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "gtfs-realtime-bindings": "^2.2.0",
+    "protobufjs": "^8.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

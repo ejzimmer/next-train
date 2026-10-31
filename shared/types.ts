@@ -1,5 +1,7 @@
 export type Direction = "citybound" | "outbound";
 
+export type City = "melbourne" | "sydney";
+
 export interface SchematicStation {
   id: string;
   name: string;
@@ -15,18 +17,24 @@ export interface SchematicStation {
   via?: [number, number][];
 }
 
-/** A line on the network map (shared/network.ts). Stations are listed city end first. */
+/**
+ * A line on a network map (shared/network.ts, shared/sydney.ts). Stations are listed city end first, or
+ * from one end to the other on lines through the city; "outbound" is always the way the list runs.
+ */
 export interface LineConfig {
   id: string;
-  mode: "metro-train" | "tram";
+  city: City;
+  mode: "metro-train" | "train" | "light-rail";
   name: string;
+  /** The switch that shows the line: the line's own, or one shared by a line's branches (Sydney's T1, say). */
+  switchId: string;
   colour: string;
   /** Text colour on the line's colour. */
   textColour: string;
   /** Lines in the same group share a colour and are drawn as one where they share track. */
   group: string;
-  /** Substring matched against GTFS-R route_id, e.g. "-HBE:" for aus:vic:vic-02-HBE: */
-  routeIdMatch: string;
+  /** Substrings matched against GTFS-R route_id, e.g. "-HBE:" for aus:vic:vic-02-HBE: */
+  routeIdMatch: string[];
   /** First and last station of the City Loop section, skipped when trains run direct to Flinders Street. */
   cityLoop?: [string, string];
   /** Stations whose departures show a platform number. */
@@ -71,9 +79,11 @@ export interface VehicleDto {
    * Segments past the last station are the line's extra `track`, in order. */
   segment: number;
   fraction: number;
-  /** Inferred from the car numbers in the vehicle id; null when unrecognised. */
+  /** Inferred from the car numbers in the vehicle id, or given by the feed; null when unknown. */
   trainType: string | null;
   cars: number;
+  /** The car (or tram) numbers, when the feed gives real ones. */
+  carNumbers: string[] | null;
 }
 
 export interface DepartureDto {

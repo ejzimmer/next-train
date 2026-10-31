@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { LINES, STATIONS } from "../shared/network";
 import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
+import { useNetwork } from "./networks";
 import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
 import { useStopped } from "./useStopped";
 
@@ -17,8 +17,6 @@ const CELL = 16;
 /** Space around the drawing, so labels and trains at the edges aren't cut off. */
 const MARGIN = 24;
 const [MIN_ZOOM, MAX_ZOOM] = [0.2, 3];
-/** Trains on this line keep the usual colours; trains on other lines are white, as shared-track trains were before. */
-const HOME_LINE = "hurstbridge";
 
 interface Props {
   /** The lines switched on. */
@@ -92,9 +90,11 @@ export function LineMap({
   reveal,
   board,
 }: Props) {
+  const network = useNetwork();
+  const { lines: LINES, stations: STATIONS, homeLine } = network;
   const scroller = useRef<HTMLDivElement>(null);
   const stopped = useStopped(vehicles);
-  const geometry = useMemo(() => networkGeometry(lines, LINES), [lines]);
+  const geometry = useMemo(() => networkGeometry(lines, LINES, network), [lines, LINES, network]);
 
   const stations = useMemo(() => {
     const byId = new Map<string, MapStation>();
@@ -373,7 +373,7 @@ export function LineMap({
             const n = line.stations.length - 1;
             const main = geo.segments.slice(0, n).flat();
             return (
-              <g key={line.id} stroke={line.colour} strokeWidth={8} fill="none" strokeLinejoin="round">
+              <g key={line.id} stroke={line.colour} strokeWidth={line.mode === "light-rail" ? 6 : 8} fill="none" strokeLinejoin="round">
                 {geo.segments.slice(n).map((track, i) => (
                   <path key={i} d={pathOf(track)} strokeLinecap="round" />
                 ))}
@@ -458,7 +458,7 @@ export function LineMap({
             return (
               <g
                 key={v.id}
-                className={`train${v.line === HOME_LINE ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
+                className={`train${!homeLine || v.line === homeLine ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
                 style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
                 onClick={select}
                 onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && select()}
@@ -486,8 +486,9 @@ export function LineMap({
         </svg>
         {lines.length > 0 && (
           <Legend
-            home={lines.some((l) => l.id === HOME_LINE)}
-            others={lines.some((l) => l.id !== HOME_LINE)}
+            homeName={homeLine && LINES.find((l) => l.id === homeLine)!.name}
+            home={!homeLine || lines.some((l) => l.id === homeLine)}
+            others={!!homeLine && lines.some((l) => l.id !== homeLine)}
             closed={closedStretches.length > 0}
             colour={lines[0].colour}
           />
@@ -559,8 +560,19 @@ function boardPosition(
 
 const ARROW = "M14,0 L-10,-11 L-5,0 L-10,11 Z";
 
-function Legend({ home, others, closed, colour }: { home: boolean; others: boolean; closed: boolean; colour: string }) {
-  const homeName = LINES.find((l) => l.id === HOME_LINE)!.name;
+function Legend({
+  homeName,
+  home,
+  others,
+  closed,
+  colour,
+}: {
+  homeName: string | null;
+  home: boolean;
+  others: boolean;
+  closed: boolean;
+  colour: string;
+}) {
   const items: [string, string][] = [
     ...(home && others
       ? ([

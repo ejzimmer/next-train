@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { LINES, STATIONS } from "../shared/network";
-import type { AlertDto, LineConfig } from "../shared/types";
+import type { AlertDto } from "../shared/types";
 import { calendarWeeks, disruptedDays } from "./calendar";
+import { useNetwork, type Network, type Switch } from "./networks";
 
 interface Props {
-  /** Each alert with the lines it's on. */
-  alerts: { alert: AlertDto; lines: LineConfig[] }[] | undefined;
+  /** Each alert with the switches of the lines it's on. */
+  alerts: { alert: AlertDto; lines: Switch[] }[] | undefined;
   now: number;
 }
 
@@ -40,7 +40,9 @@ function headline(alert: AlertDto, name: (id: string) => string) {
     ? `Some trains start or end at ${new Intl.ListFormat("en-AU", { type: "disjunction" }).format(alert.shortRuns.map(name))}`
     : null;
   if (alert.kind === "delays") return { title: `Delays up to ${alert.delay} minutes`, sub: shortRuns };
-  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: shortRuns };
+  // Without "Planned works:", or the line's name in front ("T1 Western Line: ..."), as the notice names the lines.
+  const title = alert.header.replace(/^planned works?:?\s*/i, "").replace(/^[TL]\d[^:]*\bLine:\s*/, "");
+  return { title: title || "Disruption", sub: shortRuns };
 }
 
 function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
@@ -72,8 +74,8 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
 }
 
 /** What a notice shows above its details. */
-function summary(alert: AlertDto, now: number) {
-  const name = (id: string) => STATIONS[id]?.name ?? id;
+function summary(alert: AlertDto, now: number, network: Network) {
+  const name = (id: string) => network.stations[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
@@ -87,16 +89,16 @@ interface Merged {
   /** What the merged alerts have in common. */
   id: string;
   alert: AlertDto;
-  lines: LineConfig[];
+  lines: Switch[];
   /** Every different description among the alerts merged into this notice. */
   descriptions: string[];
 }
 
 /** Alerts that would show the same notice (e.g. each line's "No City Loop" for the same nights) become one. */
-function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: number): Merged[] {
+function mergeAlike(alerts: { alert: AlertDto; lines: Switch[] }[], now: number, network: Network): Merged[] {
   const byKey = new Map<string, Merged>();
   for (const { alert, lines } of alerts) {
-    const { title, sub, after, days } = summary(alert, now);
+    const { title, sub, after, days } = summary(alert, now, network);
     // The same alert on several lines (whatever its times on each), or different alerts that read the same.
     const keys = [JSON.stringify([alert.id, title, sub]), JSON.stringify([title, sub, after, [...days]])];
     const merged = keys.map((k) => byKey.get(k)).find(Boolean);
@@ -110,12 +112,13 @@ function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: num
     if (!merged.descriptions.includes(alert.description)) merged.descriptions.push(alert.description);
   }
   const notices = [...new Set(byKey.values())];
-  for (const m of notices) m.lines.sort((a, b) => LINES.indexOf(a) - LINES.indexOf(b));
+  for (const m of notices) m.lines.sort((a, b) => network.switches.indexOf(a) - network.switches.indexOf(b));
   return notices;
 }
 
 function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
-  const { title, sub, after } = summary(alert, now);
+  const network = useNetwork();
+  const { title, sub, after } = summary(alert, now, network);
   const live = !alert.start || alert.start <= now;
   return (
     <section className={`notice${live ? " live" : ""}`}>
@@ -145,7 +148,7 @@ function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
         {alert.url && (
           <p>
             <a href={alert.url} target="_blank" rel="noreferrer">
-              More on transport.vic.gov.au
+              More on {network.alertsSite}
             </a>
           </p>
         )}
@@ -164,6 +167,7 @@ function savedCollapsed() {
 
 /** All the disruptions on one board, styled after Metro's station posters. The orange bar folds it away. */
 export function Disruptions({ alerts, now }: Props) {
+  const network = useNetwork();
   const [collapsed, setCollapsed] = useState(savedCollapsed);
   if (!alerts?.length) return null;
   const toggle = () => {
@@ -174,7 +178,7 @@ export function Disruptions({ alerts, now }: Props) {
       // Not remembered; fine.
     }
   };
-  const notices = mergeAlike(alerts, now);
+  const notices = mergeAlike(alerts, now, network);
   const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
   return (
     <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">

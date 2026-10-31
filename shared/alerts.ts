@@ -80,7 +80,7 @@ function between(s: string, phrase: RegExp, line: LineConfig): Stretch | null {
  * same works twice (a "Planned Works" alert and a "Planned work: ..." one), so duplicates are merged.
  */
 export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData, now: number): AlertsResponse {
-  const own = line.routeIdMatch.replace(/:$/, "");
+  const own = line.routeIdMatch.map((m) => m.replace(/:$/, ""));
   const stationOf = new Map<string, string>();
   for (const s of line.stations) data.stations[s.id]?.stopIds.forEach((stop) => stationOf.set(stop, s.id));
 
@@ -88,7 +88,7 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
   for (const entity of feed.entity) {
     const a = entity.alert;
     const entities = a?.informedEntity ?? [];
-    if (!a || !entities.some((e) => e.routeId?.includes(own))) continue;
+    if (!a || !entities.some((e) => own.some((m) => e.routeId?.includes(m)))) continue;
     const effect = Alert.Effect[a.effect ?? Alert.Effect.UNKNOWN_EFFECT] ?? "UNKNOWN_EFFECT";
     if (NOTICE_EFFECTS.has(effect)) continue;
 

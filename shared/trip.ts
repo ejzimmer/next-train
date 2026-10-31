@@ -1,6 +1,7 @@
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
 import { withScheduledGaps } from "./departures";
+import { nearestServiceMidnight, resolveUpdates, serviceMidnight, stationsByStop } from "./schedule";
 import type { LineConfig, LineData, TripDto } from "./types";
 
 const { TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -39,9 +40,10 @@ export function buildTrip(
   const timed = data.times?.trips[tripId];
   const pattern = timed ? data.times!.patterns[timed[0]] : [];
   const scheduled = new Map(pattern.map(([seq, , offset]) => [seq, timed![1] + offset]));
-  const midnight = serviceMidnight(tu.trip.startDate);
+  const midnight = serviceMidnight(tu.trip.startDate) ?? (timed ? nearestServiceMidnight(timed[1], now) : null);
 
-  const updates = withScheduledGaps(tu.stopTimeUpdate ?? [], data.times, tripId);
+  const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip.startDate, now);
+  const updates = withScheduledGaps(resolved, data.times, tripId);
   const stops: TripDto["stops"] = [];
   let delay: number | null = null;
   for (const u of updates) {
@@ -66,30 +68,4 @@ export function buildTrip(
     delay,
     stops,
   };
-}
-
-/** Station id by GTFS stop id; every line shares one stations table, so it's worked out once. */
-const byStop = new WeakMap<LineData["stations"], Map<string, string>>();
-function stationsByStop(data: LineData) {
-  let map = byStop.get(data.stations);
-  if (!map) {
-    map = new Map();
-    for (const [id, s] of Object.entries(data.stations)) for (const stop of s.stopIds) map.set(stop, id);
-    byStop.set(data.stations, map);
-  }
-  return map;
-}
-
-const melbourneHour = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", hour: "numeric", hourCycle: "h23" });
-
-/** Unix seconds at noon minus 12 hours, Melbourne time, on a GTFS service date (YYYYMMDD): what GTFS times count from. */
-function serviceMidnight(date: string | null | undefined): number | null {
-  const m = date?.match(/^(\d{4})(\d{2})(\d{2})$/);
-  if (!m) return null;
-  const noonUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], 12);
-  // Melbourne's offset at noon that day, from how the date reads there.
-  const parts = melbourneHour.formatToParts(noonUtc);
-  const hour = Number(parts.find((p) => p.type === "hour")!.value);
-  const offset = (((hour - 12) % 24) + 24) % 24;
-  return noonUtc / 1000 - (offset + 12) * 3600;
 }
