@@ -17,9 +17,6 @@ const BUSES = /buses replace trains between /gi;
 /** Line suspended without buses, e.g. "Hurstbridge line suspended between Eltham and Hurstbridge". */
 const SUSPENDED = /(?:suspended|no trains(?: run)?) between /gi;
 
-/** The trains still running on part of the line, e.g. "A train service will operate between Flinders Street and Eltham". */
-const TRAINS = /(?:trains? services? (?:will )?(?:operates?|runs?)|trains (?:will )?run) between /gi;
-
 /** Delays, e.g. "Delays up to 20 minutes now clearing after an earlier equipment fault". */
 const DELAYS = /delays (?:of )?up to (\d+) min/i;
 
@@ -78,19 +75,6 @@ function between(s: string, phrase: RegExp, line: LineConfig): Stretch | null {
 }
 
 /**
- * Track with no trains: the bus stretch, cut back to where the shortened train service ends. Trains can run
- * into it (Flinders Street to Eltham with buses from Greensborough) or stop short of it, leaving a gap.
- */
-function noTrains(buses: Stretch, trains: Stretch | null, line: LineConfig): Stretch {
-  if (!trains) return buses;
-  const at = (id: string) => line.stations.findIndex((s) => s.id === id);
-  const [b0, b1, t0, t1] = [buses.from, buses.to, trains.from, trains.to].map(at);
-  if (t0 <= b0 && t1 < b1) return { from: trains.to, to: buses.to };
-  if (t1 >= b1 && t0 > b0) return { from: buses.from, to: trains.from };
-  return buses;
-}
-
-/**
  * Current and coming week's train disruptions for the line, including its rail replacement buses
  * (route ids like aus:vic:vic-02-HBE-R:). The feed repeats each alert per route, and often posts the
  * same works twice (a "Planned Works" alert and a "Planned work: ..." one), so duplicates are merged.
@@ -121,7 +105,6 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
     const both = `${header}\n${description}`;
     const buses = between(both, BUSES, line);
     const suspended = !buses ? between(both, SUSPENDED, line) : null;
-    const trains = buses || suspended ? between(both, TRAINS, line) : null;
     const loop = !buses && !suspended && NO_LOOP.test(both);
     const delay = DELAYS.exec(both);
     const shortRun = SHORT_RUNS.exec(both);
@@ -134,20 +117,11 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
           : delay
             ? "delays"
             : "other";
-    const closed = buses ?? suspended;
-    const stretch = closed
-      ? noTrains(closed, trains, line)
-      : loop && line.cityLoop
-        ? { from: line.cityLoop[0], to: line.cityLoop[1] }
-        : null;
+    const stretch = buses ?? suspended ?? (loop && line.cityLoop ? { from: line.cityLoop[0], to: line.cityLoop[1] } : null);
     const stations = [
       ...new Set(entities.map((e) => stationOf.get(e.stopId ?? "")).filter((s): s is string => !!s)),
     ];
-    const key = closed
-      ? `${kind}:${closed.from}:${closed.to}:${trains?.from}:${trains?.to}`
-      : stretch
-        ? `${kind}:${stretch.from}:${stretch.to}`
-        : both;
+    const key = stretch ? `${kind}:${stretch.from}:${stretch.to}` : both;
     const alert: AlertDto = {
       id: entity.id,
       kind,
@@ -160,8 +134,6 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
       periods,
       stations,
       stretch,
-      closed,
-      trains,
       delay: delay ? Number(delay[1]) : null,
       shortRuns: shortRun ? stationsIn(shortRun[1], line) : [],
     };

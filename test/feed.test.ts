@@ -239,7 +239,7 @@ describe("partial suspensions", () => {
   const parse = (header: string, description: string) =>
     buildAlerts(alert(header, description), hurstbridge.config, hurstbridge.data, 1792800000).alerts[0];
 
-  it("reads the bus stretch and the shortened train service out of an unplanned suspension", () => {
+  it("reads the bus stretch out of an unplanned suspension", () => {
     // Metro's wording, 31 October 2026.
     const a = parse(
       "Hurstbridge Line Suspended",
@@ -249,10 +249,7 @@ describe("partial suspensions", () => {
         "* Allow extra travel time.",
     );
     expect(a.kind).toBe("buses");
-    expect(a.closed).toEqual({ from: "greensborough", to: "hurstbridge" });
-    expect(a.trains).toEqual({ from: "flinders-street", to: "eltham" });
-    // Trains still run as far as Eltham, inside the bus stretch.
-    expect(a.stretch).toEqual({ from: "eltham", to: "hurstbridge" });
+    expect(a.stretch).toEqual({ from: "greensborough", to: "hurstbridge" });
   });
 
   it.each([
@@ -261,23 +258,13 @@ describe("partial suspensions", () => {
   ])("reads %s", (header, description) => {
     const a = parse(header, description);
     expect(a.kind).toBe("buses");
-    expect(a.closed).toEqual({ from: "heidelberg", to: "greensborough" });
-    expect(a.stretch).toEqual(a.closed);
-    expect(a.trains).toBeNull();
-  });
-
-  it("counts the gap between where trains stop and buses start as having no trains", () => {
-    const a = parse(
-      "Buses replace trains between Eltham and Hurstbridge",
-      "Trains run between Flinders Street and Greensborough only.",
-    );
-    expect(a.stretch).toEqual({ from: "greensborough", to: "hurstbridge" });
+    expect(a.stretch).toEqual({ from: "heidelberg", to: "greensborough" });
   });
 
   it("recognises a suspension without buses", () => {
     const a = parse("Hurstbridge line suspended between Eltham and Hurstbridge", "Due to a police request.");
     expect(a.kind).toBe("suspended");
-    expect(a.closed).toEqual({ from: "eltham", to: "hurstbridge" });
+    expect(a.stretch).toEqual({ from: "eltham", to: "hurstbridge" });
   });
 
   it("reads delays and trains turning back early, without closing any track", () => {
