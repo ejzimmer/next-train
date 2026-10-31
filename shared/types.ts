@@ -120,8 +120,9 @@ export interface StationDeparturesResponse {
 
 export interface AlertDto {
   id: string;
-  /** "buses": buses replace trains on `stretch`; "loop": trains run direct to Flinders Street, not via the City Loop. */
-  kind: "buses" | "loop" | "other";
+  /** "buses": buses replace trains on `stretch`; "suspended": no trains on `stretch`, and no buses named;
+   * "loop": trains run direct to Flinders Street, not via the City Loop; "delays": trains running late by up to `delay`. */
+  kind: "buses" | "suspended" | "loop" | "delays" | "other";
   header: string;
   description: string;
   url: string | null;
@@ -134,8 +135,12 @@ export interface AlertDto {
   periods: { start: number | null; end: number | null }[];
   /** Station ids named in the alert, when it's about particular stations. */
   stations: string[];
-  /** The stretch of line with no trains (city end first), for buses and City Loop closures. */
+  /** The stretch of line with no trains (city end first), for buses, suspensions and City Loop closures. */
   stretch: { from: string; to: string } | null;
+  /** Minutes trains may be delayed by, when the alert says. */
+  delay: number | null;
+  /** Stations where some trains may start or end instead of running the whole line. */
+  shortRuns: string[];
 }
 
 export interface AlertsResponse {

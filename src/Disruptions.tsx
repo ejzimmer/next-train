@@ -32,10 +32,15 @@ function Moon() {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function headline(alert: AlertDto, name: (id: string) => string) {
-  if (alert.kind === "buses" && alert.stretch)
-    return { title: "Buses replace trains", sub: `between ${name(alert.stretch.from)} and ${name(alert.stretch.to)}` };
+  const span = (s: { from: string; to: string }) => `between ${name(s.from)} and ${name(s.to)}`;
+  if (alert.kind === "buses" && alert.stretch) return { title: "Buses replace trains", sub: span(alert.stretch) };
+  if (alert.kind === "suspended" && alert.stretch) return { title: "No trains", sub: span(alert.stretch) };
   if (alert.kind === "loop") return { title: "No City Loop", sub: null };
-  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: null };
+  const shortRuns = alert.shortRuns.length
+    ? `Some trains start or end at ${new Intl.ListFormat("en-AU", { type: "disjunction" }).format(alert.shortRuns.map(name))}`
+    : null;
+  if (alert.kind === "delays") return { title: `Delays up to ${alert.delay} minutes`, sub: shortRuns };
+  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: shortRuns };
 }
 
 function Calendar({ alert, now }: { alert: AlertDto; now: number }) {

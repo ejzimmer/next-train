@@ -219,6 +219,76 @@ describe("City Loop closures", () => {
   });
 });
 
+describe("partial suspensions", () => {
+  const alert = (header: string, description: string) =>
+    GtfsRealtimeBindings.transit_realtime.FeedMessage.create({
+      header: { gtfsRealtimeVersion: "2.0", timestamp: 1792800000 },
+      entity: [
+        {
+          id: "1",
+          alert: {
+            effect: GtfsRealtimeBindings.transit_realtime.Alert.Effect.REDUCED_SERVICE,
+            activePeriod: [{ start: 1792800000 }],
+            informedEntity: [{ routeId: "aus:vic:vic-02-HBE:" }],
+            headerText: { translation: [{ text: header, language: "en" }] },
+            descriptionText: { translation: [{ text: description, language: "en" }] },
+          },
+        },
+      ],
+    });
+  const parse = (header: string, description: string) =>
+    buildAlerts(alert(header, description), hurstbridge.config, hurstbridge.data, 1792800000).alerts[0];
+
+  it("reads the bus stretch out of an unplanned suspension", () => {
+    // Metro's wording, 31 October 2026.
+    const a = parse(
+      "Hurstbridge Line Suspended",
+      "Buses replace trains between Greensborough and Hurstbridge due to a track fault in the Diamond Creek area.\n\n" +
+        "* Replacement buses have been ordered, however will take over 60 minutes to arrive.\n" +
+        "* A train service will operate between Flinders Street and Eltham, with delays to the service.\n" +
+        "* Allow extra travel time.",
+    );
+    expect(a.kind).toBe("buses");
+    expect(a.stretch).toEqual({ from: "greensborough", to: "hurstbridge" });
+  });
+
+  it.each([
+    ["Buses replace trains between Heidelberg and Greensborough from 8.30pm Friday", ""],
+    ["Planned works", "Buses replace trains between Greensborough to Heidelberg, Saturday 1 November."],
+  ])("reads %s", (header, description) => {
+    const a = parse(header, description);
+    expect(a.kind).toBe("buses");
+    expect(a.stretch).toEqual({ from: "heidelberg", to: "greensborough" });
+  });
+
+  it("recognises a suspension without buses", () => {
+    const a = parse("Hurstbridge line suspended between Eltham and Hurstbridge", "Due to a police request.");
+    expect(a.kind).toBe("suspended");
+    expect(a.stretch).toEqual({ from: "eltham", to: "hurstbridge" });
+  });
+
+  it("reads delays and trains turning back early, without closing any track", () => {
+    // Metro's wording, 31 October 2026, as the same fault cleared.
+    const a = parse(
+      "Major Delays - Hurstbridge Line",
+      "Delays up to 20 minutes now clearing after an earlier equipment fault in the Eltham area.\n\n" +
+        "* Select trains may terminate/originate at Greensborough or/and Eltham.\n" +
+        "* Buses may supplement services as we recover the timetable.\n\n" +
+        "Check information displays and listen for announcements as services may be altered at short notice.",
+    );
+    expect(a.kind).toBe("delays");
+    expect(a.delay).toBe(20);
+    expect(a.shortRuns).toEqual(["greensborough", "eltham"]);
+    expect(a.stretch).toBeNull();
+  });
+
+  it("leaves a suspension that names no stations as it is", () => {
+    const a = parse("Hurstbridge Line Suspended", "Due to a track fault. Replacement buses have been ordered.");
+    expect(a.kind).toBe("other");
+    expect(a.stretch).toBeNull();
+  });
+});
+
 describe("disruptedDays", () => {
   // Melbourne is UTC+11 in October.
   const melb = (d: number, h: number, m = 0) => Date.UTC(2026, 9, d, h - 11, m) / 1000;
