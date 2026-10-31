@@ -3,6 +3,7 @@ import melbourneStations from "../data/stations.json";
 import sydneyStations from "../data/sydney/stations.json";
 import * as melbourne from "../shared/network";
 import * as sydney from "../shared/sydney";
+import type { Cartoon } from "./Loading";
 import type { City, LineConfig, SchematicStation } from "../shared/types";
 
 /** A button above the map showing and hiding its lines. */
@@ -36,6 +37,8 @@ export interface Network {
   /** Trains on this line keep the usual colours; trains on other lines are white. Null for none. */
   homeLine: string | null;
   attribution: string;
+  /** The cartoon train on the loading and "Trip finished" screens. */
+  cartoon: { model: Cartoon; cars: number };
   /** Where an alert's link goes, for its "More on ..." text. */
   alertsSite: string;
 }
@@ -54,6 +57,7 @@ export const NETWORKS: Record<City, Network> = {
     switches: melbourne.LINES.map((l) => ({ id: l.id, name: l.name, title: `${l.name} line`, colour: l.colour, textColour: l.textColour })),
     defaultSwitches: ["hurstbridge"],
     homeLine: "hurstbridge",
+    cartoon: { model: "xtrapolis", cars: 6 },
     attribution:
       "Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence. Not affiliated with PTV.",
     alertsSite: "transport.vic.gov.au",
@@ -71,6 +75,7 @@ export const NETWORKS: Record<City, Network> = {
     switches: sydney.SWITCHES.map((s) => ({ ...s, colour: sydney.GROUPS[s.id].colour, textColour: sydney.GROUPS[s.id].text })),
     defaultSwitches: ["t8"],
     homeLine: null,
+    cartoon: { model: "waratah", cars: 8 },
     attribution: "Source: Transport for NSW Open Data, under a Creative Commons Attribution 4.0 International Licence. Not affiliated with Transport for NSW.",
     alertsSite: "transportnsw.info",
   },
