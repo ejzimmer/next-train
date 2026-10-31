@@ -280,6 +280,21 @@ describe("partial suspensions", () => {
     expect(a.closed).toEqual({ from: "eltham", to: "hurstbridge" });
   });
 
+  it("reads delays and trains turning back early, without closing any track", () => {
+    // Metro's wording, 31 October 2026, as the same fault cleared.
+    const a = parse(
+      "Hurstbridge Line Delays",
+      "Delays up to 20 minutes now clearing after an earlier equipment fault in the Eltham area.\n\n" +
+        "* Select trains may terminate/originate at Greensborough or/and Eltham.\n" +
+        "* Buses may supplement services as we recover the timetable.\n\n" +
+        "Check information displays and listen for announcements as services may be altered at short notice.",
+    );
+    expect(a.kind).toBe("delays");
+    expect(a.delay).toBe(20);
+    expect(a.shortRuns).toEqual(["greensborough", "eltham"]);
+    expect(a.stretch).toBeNull();
+  });
+
   it("leaves a suspension that names no stations as it is", () => {
     const a = parse("Hurstbridge Line Suspended", "Due to a track fault. Replacement buses have been ordered.");
     expect(a.kind).toBe("other");

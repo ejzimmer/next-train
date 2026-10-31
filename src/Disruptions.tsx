@@ -37,7 +37,11 @@ function headline(alert: AlertDto, name: (id: string) => string) {
   if (alert.kind === "buses" && alert.closed) return { title: "Buses replace trains", sub: span(alert.closed), trains };
   if (alert.kind === "suspended" && alert.closed) return { title: "No trains", sub: span(alert.closed), trains };
   if (alert.kind === "loop") return { title: "No City Loop", sub: null, trains: null };
-  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: null, trains: null };
+  const shortRuns = alert.shortRuns.length
+    ? `Some trains start or end at ${new Intl.ListFormat("en-AU", { type: "disjunction" }).format(alert.shortRuns.map(name))}`
+    : null;
+  if (alert.kind === "delays") return { title: `Delays up to ${alert.delay} minutes`, sub: shortRuns, trains: null };
+  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: shortRuns, trains: null };
 }
 
 function Calendar({ alert, now }: { alert: AlertDto; now: number }) {

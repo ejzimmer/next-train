@@ -20,6 +20,12 @@ const SUSPENDED = /(?:suspended|no trains(?: run)?) between /gi;
 /** The trains still running on part of the line, e.g. "A train service will operate between Flinders Street and Eltham". */
 const TRAINS = /(?:trains? services? (?:will )?(?:operates?|runs?)|trains (?:will )?run) between /gi;
 
+/** Delays, e.g. "Delays up to 20 minutes now clearing after an earlier equipment fault". */
+const DELAYS = /delays (?:of )?up to (\d+) min/i;
+
+/** Trains cut short, e.g. "Select trains may terminate/originate at Greensborough or/and Eltham." */
+const SHORT_RUNS = /(?:terminate|originate)[^.\n]*? at ([^.\n]+)/i;
+
 /** City Loop closures: "Trains run direct to and from Flinders Street, not via the City Loop", "No City Loop trains". */
 const NO_LOOP = /not via the city loop|no city loop|direct to and from flinders street/i;
 
@@ -27,6 +33,21 @@ const text = (t: GtfsRealtimeBindings.transit_realtime.ITranslatedString | null 
   t?.translation?.find((x) => !x.language || x.language === "en")?.text?.trim() ?? "";
 
 type Stretch = NonNullable<AlertDto["stretch"]>;
+
+/** The line's stations named in `s`, in the order they're named. */
+function stationsIn(s: string, line: LineConfig): string[] {
+  const found = line.stations
+    .map((st) => {
+      const at = Math.min(
+        ...[st.name, st.gtfsName]
+          .filter((n): n is string => !!n)
+          .map((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").exec(s)?.index ?? Infinity),
+      );
+      return { id: st.id, at };
+    })
+    .filter((x) => Number.isFinite(x.at));
+  return found.sort((a, b) => a.at - b.at).map((x) => x.id);
+}
 
 /** The line's station that `s` starts with (the longest name, so "Flinders Street" beats a shorter one), and its length. */
 function stationAt(s: string, line: LineConfig): { index: number; length: number } | null {
@@ -102,7 +123,17 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
     const suspended = !buses ? between(both, SUSPENDED, line) : null;
     const trains = buses || suspended ? between(both, TRAINS, line) : null;
     const loop = !buses && !suspended && NO_LOOP.test(both);
-    const kind: AlertDto["kind"] = buses ? "buses" : suspended ? "suspended" : loop ? "loop" : "other";
+    const delay = DELAYS.exec(both);
+    const shortRun = SHORT_RUNS.exec(both);
+    const kind: AlertDto["kind"] = buses
+      ? "buses"
+      : suspended
+        ? "suspended"
+        : loop
+          ? "loop"
+          : delay
+            ? "delays"
+            : "other";
     const closed = buses ?? suspended;
     const stretch = closed
       ? noTrains(closed, trains, line)
@@ -131,6 +162,8 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
       stretch,
       closed,
       trains,
+      delay: delay ? Number(delay[1]) : null,
+      shortRuns: shortRun ? stationsIn(shortRun[1], line) : [],
     };
     const existing = merged.get(key);
     merged.set(key, existing ? merge(existing, alert) : alert);
