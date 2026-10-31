@@ -1,18 +1,21 @@
 import type { Config } from "@netlify/functions";
-import { fetchFeed, toNum } from "../../shared/feed";
+import { cityFeed, toNum } from "../../shared/feed";
 import { buildAlerts } from "../../shared/alerts";
-import { lines } from "../../shared/lines";
-import { apiKey, CACHE_HEADERS, errorResponse } from "../../shared/http";
+import { cities } from "../../shared/lines";
+import { CACHE_HEADERS, cityOf, errorResponse } from "../../shared/http";
 import type { NetworkAlertsResponse } from "../../shared/types";
 
-export default async () => {
+/** Every line's alerts (?city=, Melbourne by default). */
+export default async (req: Request) => {
+  const city = cityOf(req);
+  if (!city) return errorResponse(404, "Unknown city");
   try {
-    const feed = await fetchFeed("metro", "service-alerts", apiKey());
+    const feed = await cityFeed(city, "alerts");
     const now = Date.now() / 1000;
     const body: NetworkAlertsResponse = {
       feedTimestamp: toNum(feed.header.timestamp),
       lines: Object.fromEntries(
-        Object.values(lines).map(({ config, data }) => [config.id, buildAlerts(feed, config, data, now).alerts]),
+        Object.values(cities[city]).map(({ config, data }) => [config.id, buildAlerts(feed, config, data, now).alerts]),
       ),
     };
     return new Response(JSON.stringify(body), { headers: CACHE_HEADERS });

@@ -1,4 +1,3 @@
-import { EDGE_ORDER, GROUPS, type Group } from "../shared/network";
 import { segmentCount, segmentEnds } from "../shared/routes";
 import type { LineConfig } from "../shared/types";
 
@@ -6,7 +5,6 @@ export type Pt = [number, number];
 
 /** Distance between the centres of lines drawn side by side. */
 export const SPACING = 10;
-const GROUP_ORDER = Object.keys(GROUPS) as Group[];
 
 export interface LineGeometry {
   /** The drawn points of each segment (see segmentEnds), shifted sideways where lines run side by side. */
@@ -59,10 +57,15 @@ const same = (p: Pt, q: Pt) => Math.abs(p[0] - q[0]) < 0.01 && Math.abs(p[1] - q
 
 /**
  * Where each visible line is drawn. Lines of different groups that share track run side by side,
- * in group order; lines of one group share one path. `all` fixes each stretch's direction, so the
- * order doesn't flip as lines are switched on and off.
+ * in group order (`order.groupOrder`, or `order.edgeOrder` on a stretch where that would cross them over); lines of
+ * one group share one path. `all` fixes each stretch's direction, so the order doesn't flip as lines are switched
+ * on and off.
  */
-export function networkGeometry(visible: LineConfig[], all: LineConfig[]): Map<string, LineGeometry> {
+export function networkGeometry(
+  visible: LineConfig[],
+  all: LineConfig[],
+  order: { groupOrder: string[]; edgeOrder: Record<string, string[]> },
+): Map<string, LineGeometry> {
   const forward = new Map<string, string>();
   for (const line of all)
     for (let i = 0; i < segmentCount(line); i++) {
@@ -79,9 +82,9 @@ export function networkGeometry(visible: LineConfig[], all: LineConfig[]): Map<s
     const [a, b] = segmentEnds(line, i);
     const key = edgeKey(a, b);
     const present = groupsOn.get(key)!;
-    const order = (EDGE_ORDER[key] ?? GROUP_ORDER).filter((g) => present.has(g));
-    const k = order.indexOf(line.group as Group);
-    const d = (k - (order.length - 1) / 2) * SPACING;
+    const groups = (order.edgeOrder[key] ?? order.groupOrder).filter((g) => present.has(g));
+    const k = groups.indexOf(line.group);
+    const d = (k - (groups.length - 1) / 2) * SPACING;
     return forward.get(key) === a ? d : -d;
   };
 

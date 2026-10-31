@@ -1,5 +1,5 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { LINES } from "../shared/network";
+import { useNetwork } from "./networks";
 
 interface Props {
   on: string[];
@@ -26,6 +26,7 @@ function rowsAt(widths: number[], width: number) {
  * narrowed as far as it goes without adding a row, so the rows come out about the same length.
  */
 export function LineSwitches({ on, onToggle }: Props) {
+  const { switches } = useNetwork();
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [maxWidth, setMaxWidth] = useState<number>();
@@ -49,12 +50,12 @@ export function LineSwitches({ on, onToggle }: Props) {
     const observer = new ResizeObserver(balance);
     if (outer.current) observer.observe(outer.current);
     return () => observer.disconnect();
-  }, []);
+  }, [switches]);
 
   return (
     <div ref={outer}>
       <div className="line-switches" ref={inner} style={{ maxWidth }}>
-        {LINES.map((line) => {
+        {switches.map((line) => {
           const pressed = on.includes(line.id);
           return (
             <button
@@ -62,6 +63,7 @@ export function LineSwitches({ on, onToggle }: Props) {
               className="line-switch"
               aria-pressed={pressed}
               onClick={() => onToggle(line.id)}
+              title={line.title === `${line.name} line` ? undefined : line.title}
               style={{ ["--line" as string]: line.colour, ["--line-text" as string]: line.textColour }}
             >
               {line.name}

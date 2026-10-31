@@ -3,87 +3,15 @@
  * laid out after Metro's network map. Positions are written as walks from a station in one of eight
  * directions, so a branch can be moved by changing where it starts.
  */
+import { createLayout, type LineDef } from "./layout";
 import type { LineConfig, SchematicStation } from "./types";
 
-type Pt = [number, number];
-type Label = SchematicStation["label"];
-type Dir = "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
-
-const STEP: Record<Dir, Pt> = {
-  N: [0, -1],
-  NE: [1, -1],
-  E: [1, 0],
-  SE: [1, 1],
-  S: [0, 1],
-  SW: [-1, 1],
-  W: [-1, 0],
-  NW: [-1, -1],
-};
+export { stationId } from "./layout";
 
 /** GTFS stop names that differ from the name on the map. */
-const GTFS_NAMES: Record<string, string> = { Jolimont: "Jolimont-MCG" };
-
-export const stationId = (name: string) => name.toLowerCase().replace(/[^a-z]+/g, "-");
-
-const places: Record<string, Omit<SchematicStation, "via">> = {};
-/** Bends in the drawn track between two stations, keyed "from>to" in the order written. */
-const bends = new Map<string, Pt[]>();
-
-function at(name: string, x: number, y: number, label: Label) {
-  const id = stationId(name);
-  places[id] = { id, name, ...(GTFS_NAMES[name] && { gtfsName: GTFS_NAMES[name] }), x, y, label };
-}
-
-/** Moves a station's label, e.g. off a line that leaves at an angle; `nudge` shifts it a few px further. */
-function relabel(name: string, label: Label, nudge?: Pt) {
-  const s = places[stationId(name)];
-  s.label = label;
-  if (nudge) s.nudge = nudge;
-}
-
-function bend(from: string, to: string, via: Pt[]) {
-  bends.set(`${stationId(from)}>${stationId(to)}`, via);
-}
-
-/** Labels for a horizontal run take turns above and below; an array gives each station's. */
-type LegLabel = Label | "tb" | "bt" | Label[];
-
-/**
- * Places `names` one after another from station `from`, `step` px apart along `dir`
- * (diagonal steps are `step` px on each axis). `turn` px past the previous station the track
- * bends, so a leg can start at an angle to the one before it.
- */
-function walk(from: string, ...legs: { dir: Dir; step: number; label: LegLabel; names: string[]; turn?: number }[]) {
-  let prev = stationId(from);
-  let [x, y] = [places[prev].x, places[prev].y];
-  let lastDir: Dir | null = null;
-  for (const { dir, step, label, names, turn } of legs) {
-    const [dx, dy] = STEP[dir];
-    names.forEach((name, i) => {
-      let via: Pt[] | undefined;
-      if (i === 0 && lastDir && lastDir !== dir) {
-        const [lx, ly] = STEP[lastDir];
-        const t = turn ?? step / 2;
-        const corner: Pt = [x + lx * t, y + ly * t];
-        via = [corner];
-        [x, y] = [corner[0] + dx * (step - t), corner[1] + dy * (step - t)];
-      } else {
-        [x, y] = [x + dx * step, y + dy * step];
-      }
-      const l: Label = Array.isArray(label)
-        ? label[i]
-        : label === "tb"
-          ? i % 2 ? "b" : "t"
-          : label === "bt"
-            ? i % 2 ? "t" : "b"
-            : label;
-      at(name, x, y, l);
-      if (via) bend(places[prev].name, name, via);
-      prev = stationId(name);
-    });
-    lastDir = dir;
-  }
-}
+const layout = createLayout({ Jolimont: "Jolimont-MCG" });
+const { at, relabel, bend, walk } = layout.ns();
+const places = layout.places;
 
 // The city: the City Loop with Flinders Street at the bottom, and the Metro Tunnel running through it.
 at("Flinders Street", 0, 0, "b");
@@ -300,18 +228,11 @@ const TO_DANDENONG = [
   "Carnegie", "Murrumbeena", "Hughesdale", "Oakleigh", "Huntingdale", "Clayton", "Westall", "Springvale", "Sandown Park", "Noble Park", "Yarraman", "Dandenong",
 ];
 
-interface LineDef {
-  name: string;
-  code: string;
-  group: Group;
-  stations: string[];
-  /** Track between stations that aren't next to each other in `stations`, e.g. trains running direct, not via the City Loop. */
-  track?: [string, string][];
-  cityLoop?: [string, string];
-}
+/** A Metro line: `code` is its route code in GTFS route_ids, e.g. HBE in aus:vic:vic-02-HBE: */
+type MetroLineDef = Omit<LineDef, "mode" | "routeIdMatch"> & { code: string; group: Group };
 
 /** In the order the switches are shown, by group. */
-const LINE_DEFS: LineDef[] = [
+const LINE_DEFS: MetroLineDef[] = [
   {
     name: "Hurstbridge",
     code: "HBE",
@@ -429,47 +350,11 @@ const LINE_DEFS: LineDef[] = [
   },
 ];
 
-/** Bends between two stations, whichever way round they were written. */
-function bendsBetween(a: string, b: string): Pt[] {
-  const forward = bends.get(`${a}>${b}`);
-  if (forward) return forward;
-  return [...(bends.get(`${b}>${a}`) ?? [])].reverse();
-}
-
-function station(name: string): SchematicStation {
-  const s = places[stationId(name)];
-  if (!s) throw new Error(`${name} isn't on the map`);
-  return { ...s };
-}
-
-/** Departures show a platform number at stations on more than one line. */
-const lineCount = new Map<string, number>();
-for (const def of LINE_DEFS) for (const name of def.stations) lineCount.set(stationId(name), (lineCount.get(stationId(name)) ?? 0) + 1);
-
-export const LINES: LineConfig[] = LINE_DEFS.map((def) => {
-  const stations = def.stations.map(station);
-  stations.forEach((s, i) => {
-    const via = i > 0 ? bendsBetween(stations[i - 1].id, s.id) : [];
-    if (via.length) s.via = via;
-  });
-  return {
-    id: stationId(def.name),
-    mode: "metro-train",
-    name: def.name,
-    colour: GROUPS[def.group].colour,
-    textColour: GROUPS[def.group].text,
-    group: def.group,
-    routeIdMatch: `-${def.code}:`,
-    cityLoop: def.cityLoop && [stationId(def.cityLoop[0]), stationId(def.cityLoop[1])],
-    platformStations: stations.filter((s) => lineCount.get(s.id)! > 1).map((s) => s.id),
-    stations,
-    track: (def.track ?? []).map(([from, to]) => ({
-      from: stationId(from),
-      to: stationId(to),
-      via: bendsBetween(stationId(from), stationId(to)),
-    })),
-  };
-});
+export const LINES: LineConfig[] = layout.lines(
+  "melbourne",
+  LINE_DEFS.map(({ code, ...def }) => ({ ...def, mode: "metro-train", routeIdMatch: [`-${code}:`] })),
+  GROUPS,
+);
 
 export const LINE_BY_ID: Record<string, LineConfig> = Object.fromEntries(LINES.map((l) => [l.id, l]));
 

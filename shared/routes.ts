@@ -2,7 +2,7 @@ import type { LineConfig } from "./types";
 
 /** Whether a GTFS route_id is the line's own (not its replacement buses). */
 export function isLineRoute(routeId: string | null | undefined, line: LineConfig): boolean {
-  return !!routeId?.includes(line.routeIdMatch);
+  return !!routeId && line.routeIdMatch.some((m) => routeId.includes(m));
 }
 
 /** The two stations at the ends of segment `i`: next to each other in `stations`, or one of the extra `track`s. */

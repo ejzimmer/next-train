@@ -2,35 +2,20 @@
  * Builds data/stations.json (every station on the map) and data/<line>.trips.json and .times.json
  * for each line from PTV's GTFS Schedule zip.
  *
- *   npm run gtfs -- [path-or-url-to-gtfs.zip]
+ *   npm run gtfs:melbourne -- [path-or-url-to-gtfs.zip]
  *
  * The outer zip holds one google_transit.zip per mode; Metro trains are in folder 2.
  * Re-run when the timetable changes and commit the output.
  */
-import { readFileSync, writeFileSync } from "node:fs";
-import { unzipSync, strFromU8 } from "fflate";
-import { parse } from "csv-parse/sync";
+import { writeFileSync } from "node:fs";
+import { unzipSync } from "fflate";
 import type { Direction, LineConfig, LineData, LineTimes } from "../shared/types";
 import { LINES, STATIONS } from "../shared/network";
+import { csv, eachStopTime, load, type Files, type Row } from "./gtfs";
 
 const DEFAULT_SOURCE = "https://data.ptv.vic.gov.au/downloads/gtfs.zip";
-const MODE_FOLDER: Record<LineConfig["mode"], string> = { "metro-train": "2", tram: "3" };
-
-type Row = Record<string, string>;
-
-async function load(source: string): Promise<Uint8Array> {
-  if (!/^https?:/.test(source)) return readFileSync(source);
-  console.log(`Downloading ${source}`);
-  const res = await fetch(source);
-  if (!res.ok) throw new Error(`${source} returned ${res.status}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-function csv(files: Record<string, Uint8Array>, name: string): Row[] {
-  const file = files[name];
-  if (!file) throw new Error(`${name} missing from feed`);
-  return parse(strFromU8(file), { columns: true, skip_empty_lines: true, bom: true });
-}
+/** Metro trains' folder in the outer zip. */
+const METRO_FOLDER = "2";
 
 /** "Flinders Street Railway Station (Melbourne City)" → "flinders street" */
 function stationName(stopName: string): string {
@@ -40,8 +25,6 @@ function stationName(stopName: string): string {
     .trim()
     .toLowerCase();
 }
-
-type Files = Record<string, Uint8Array>;
 
 function buildStations(files: Files) {
   const stops = csv(files, "stops.txt");
@@ -145,7 +128,7 @@ function buildLines(files: Files, stops: Row[], stationOfStop: Map<string, strin
   for (const r of csv(files, "routes.txt"))
     routeLines.set(
       r.route_id,
-      builders.filter((b) => r.route_id.includes(b.line.routeIdMatch)),
+      builders.filter((b) => b.line.routeIdMatch.some((m) => r.route_id.includes(m))),
     );
   const tripLines = new Map<string, typeof builders>();
   for (const t of csv(files, "trips.txt")) {
@@ -153,38 +136,15 @@ function buildLines(files: Files, stops: Row[], stationOfStop: Map<string, strin
     if (on?.length) tripLines.set(t.trip_id, on);
   }
 
-  // stop_times.txt is large, so go through it a row at a time instead of parsing it all.
-  const text = strFromU8(files["stop_times.txt"]);
-  let at = text.indexOf("\n") + 1;
-  const header = text
-    .slice(0, at)
-    .replace(/^\uFEFF/, "")
-    .trim()
-    .split(",");
-  const [ti, si, qi, ai, di] = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((c) =>
-    header.indexOf(c),
-  );
-  const unquote = (v: string | undefined) => v?.replace(/"/g, "");
-  const seconds = (hms: string) => hms.split(":").reduce((t, part) => t * 60 + Number(part), 0);
-  while (at < text.length) {
-    let next = text.indexOf("\n", at);
-    if (next < 0) next = text.length;
-    const cols = text.slice(at, next).replace(/\r$/, "").split(",");
-    at = next + 1;
-    const tripId = unquote(cols[ti]);
-    const on = tripId && tripLines.get(tripId);
-    if (!on) continue;
-    const time = unquote(cols[di]) || unquote(cols[ai]);
-    for (const b of on)
-      b.add(tripId, [Number(unquote(cols[qi])), unquote(cols[si])!.trim()], time ? seconds(time.trim()) : null);
-  }
+  eachStopTime(files, (tripId, stopId, seq, time) => {
+    for (const b of tripLines.get(tripId) ?? []) b.add(tripId, [seq, stopId], time);
+  });
   for (const b of builders) b.finish();
 }
 
 const outer = unzipSync(await load(process.argv[2] ?? DEFAULT_SOURCE));
-const folder = MODE_FOLDER["metro-train"];
-const inner = outer[`${folder}/google_transit.zip`];
-if (!inner) throw new Error(`Folder ${folder} missing; found ${Object.keys(outer).join(", ")}`);
+const inner = outer[`${METRO_FOLDER}/google_transit.zip`];
+if (!inner) throw new Error(`Folder ${METRO_FOLDER} missing; found ${Object.keys(outer).join(", ")}`);
 const files = unzipSync(inner);
 const { stops, stationOfStop } = buildStations(files);
 buildLines(files, stops, stationOfStop);

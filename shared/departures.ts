@@ -1,6 +1,7 @@
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
 import { isLineRoute } from "./routes";
+import { resolveUpdates } from "./schedule";
 import type { DepartureDto, DeparturesResponse, Direction, LineConfig, LineData, LineTimes } from "./types";
 
 const { TripDescriptor, TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -52,7 +53,8 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
     if (!tu || !tripId || !isLineRoute(tu.trip?.routeId, line)) continue;
     const cancelled = tu.trip.scheduleRelationship === TripDescriptor.ScheduleRelationship.CANCELED;
 
-    const stops = withScheduledGaps(tu.stopTimeUpdate ?? [], data.times, tripId)
+    const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip?.startDate, now);
+    const stops = withScheduledGaps(resolved, data.times, tripId)
       .map((u) => ({ u, index: stationOf.get(u.stopId ?? "") }))
       .filter((s): s is { u: (typeof s)["u"]; index: number } => s.index != null);
     const known = data.trips[tripId];
@@ -61,13 +63,15 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
       (stops.length >= 2 ? (stops[stops.length - 1].index > stops[0].index ? "outbound" : "citybound") : null);
     const destination = known?.dest ?? (stops.length >= 2 ? line.stations[stops[stops.length - 1].index].id : null);
 
+    // Sydney destinations can be a headsign ("Penrith via Parramatta"): then the trip ends at its last stop.
+    const ends = line.city === "sydney" && !line.stations.some((s) => s.id === destination) ? stops[stops.length - 1]?.u : null;
     for (const { u, index } of stops) {
       if (u.scheduleRelationship === TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED) continue;
       const station = line.stations[index];
       // Departure time where given; arrival time at the terminus.
       const time = toNum(u.departure?.time) || toNum(u.arrival?.time);
       // Recently-due departures stay in, so the board can keep a train that is late leaving.
-      if (!time || time < now - LATE_GRACE || station.id === destination) continue;
+      if (!time || time < now - LATE_GRACE || station.id === destination || u === ends) continue;
       const platform = line.platformStations.includes(station.id)
         ? (data.stations[station.id].platforms[u.stopId ?? ""] ?? null)
         : null;

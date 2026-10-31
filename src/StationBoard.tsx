@@ -1,6 +1,6 @@
-import { LINE_BY_ID, STATIONS } from "../shared/network";
 import { progress } from "../shared/routes";
-import type { DepartureDto, VehicleDto } from "../shared/types";
+import type { DepartureDto, LineConfig, VehicleDto } from "../shared/types";
+import { useNetwork } from "./networks";
 
 interface Props {
   stationId: string;
@@ -35,10 +35,11 @@ const CITY_GRACE = 2 * 60;
  * Whether a departure should still be listed. Predictions can pass while the train is still at the platform
  * (or hasn't reported for a while), so a late one stays up as "Now" until its train is seen past the station.
  */
-function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], now: number) {
+function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], now: number, lineById: Record<string, LineConfig>) {
   if (d.time >= now - 30) return true;
   const v = vehicles.find((x) => x.tripId === d.tripId);
-  const line = LINE_BY_ID[d.line];
+  // The train can be drawn on another branch of its line, where the stations are in another order.
+  const line = v?.line === d.line ? lineById[d.line] : null;
   if (!v || !d.direction || !line) return false;
   const index = (id: string) => line.stations.findIndex((s) => s.id === id);
   const stationIndex = index(stationId);
@@ -57,10 +58,11 @@ function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], no
 
 /** The "following trains" list from a Metro platform display, each row in its line's colour. */
 export function StationBoard({ stationId, colour, departures, vehicles, now, onClose }: Props) {
+  const { stations, lineById } = useNetwork();
   // A destination off the line (e.g. a Stony Point train running on) is already a name.
-  const name = (id: string | null) => STATIONS[id ?? ""]?.name ?? id ?? "";
+  const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const stationName = name(stationId);
-  const upcoming = (departures ?? []).filter((d) => stillDue(d, stationId, vehicles, now)).slice(0, 4);
+  const upcoming = (departures ?? []).filter((d) => stillDue(d, stationId, vehicles, now, lineById)).slice(0, 4);
 
   return (
     <div className="pid" role="dialog" aria-label={`Next trains from ${stationName}`} style={{ borderTopColor: colour }}>
@@ -74,7 +76,7 @@ export function StationBoard({ stationId, colour, departures, vehicles, now, onC
         <p className="pid-empty">No trains in the live feed</p>
       ) : (
         upcoming.map((d) => (
-          <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: LINE_BY_ID[d.line]?.colour }}>
+          <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: lineById[d.line]?.colour }}>
             <span className="pid-time">{formatTime(d.time)}</span>
             <span className="pid-dest">{name(d.destination)}</span>
             {d.platform && <span className="pid-detail">Plat {d.platform}</span>}
