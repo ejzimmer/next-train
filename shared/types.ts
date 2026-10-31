@@ -120,8 +120,9 @@ export interface StationDeparturesResponse {
 
 export interface AlertDto {
   id: string;
-  /** "buses": buses replace trains on `stretch`; "loop": trains run direct to Flinders Street, not via the City Loop. */
-  kind: "buses" | "loop" | "other";
+  /** "buses": buses replace trains on `closed`; "suspended": no trains on `closed`, and no buses named;
+   * "loop": trains run direct to Flinders Street, not via the City Loop. */
+  kind: "buses" | "suspended" | "loop" | "other";
   header: string;
   description: string;
   url: string | null;
@@ -136,6 +137,10 @@ export interface AlertDto {
   stations: string[];
   /** The stretch of line with no trains (city end first), for buses and City Loop closures. */
   stretch: { from: string; to: string } | null;
+  /** The stretch the alert names as replaced by buses or suspended (city end first). */
+  closed: { from: string; to: string } | null;
+  /** Where trains still run when the line is cut short, e.g. Flinders Street to Eltham. */
+  trains: { from: string; to: string } | null;
 }
 
 export interface AlertsResponse {

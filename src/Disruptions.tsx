@@ -32,10 +32,12 @@ function Moon() {
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function headline(alert: AlertDto, name: (id: string) => string) {
-  if (alert.kind === "buses" && alert.stretch)
-    return { title: "Buses replace trains", sub: `between ${name(alert.stretch.from)} and ${name(alert.stretch.to)}` };
-  if (alert.kind === "loop") return { title: "No City Loop", sub: null };
-  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: null };
+  const span = (s: { from: string; to: string }) => `between ${name(s.from)} and ${name(s.to)}`;
+  const trains = alert.trains && `Trains run ${span(alert.trains)}`;
+  if (alert.kind === "buses" && alert.closed) return { title: "Buses replace trains", sub: span(alert.closed), trains };
+  if (alert.kind === "suspended" && alert.closed) return { title: "No trains", sub: span(alert.closed), trains };
+  if (alert.kind === "loop") return { title: "No City Loop", sub: null, trains: null };
+  return { title: alert.header.replace(/^planned works?:?\s*/i, "") || "Disruption", sub: null, trains: null };
 }
 
 function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
@@ -69,13 +71,13 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
 /** What a notice shows above its details. */
 function summary(alert: AlertDto, now: number) {
   const name = (id: string) => STATIONS[id]?.name ?? id;
-  const { title, sub } = headline(alert, name);
+  const { title, sub, trains } = headline(alert, name);
   const days = disruptedDays(alert.periods, now);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
   // When the trains stop each night, from the same periods the calendar uses.
   const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
   const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
-  return { title, sub, after, days };
+  return { title, sub, trains, after, days };
 }
 
 interface Merged {
@@ -91,9 +93,9 @@ interface Merged {
 function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: number): Merged[] {
   const byKey = new Map<string, Merged>();
   for (const { alert, lines } of alerts) {
-    const { title, sub, after, days } = summary(alert, now);
+    const { title, sub, trains, after, days } = summary(alert, now);
     // The same alert on several lines (whatever its times on each), or different alerts that read the same.
-    const keys = [JSON.stringify([alert.id, title, sub]), JSON.stringify([title, sub, after, [...days]])];
+    const keys = [JSON.stringify([alert.id, title, sub, trains]), JSON.stringify([title, sub, trains, after, [...days]])];
     const merged = keys.map((k) => byKey.get(k)).find(Boolean);
     if (!merged) {
       const m = { id: keys[0], alert, lines: [...lines], descriptions: [alert.description] };
@@ -110,7 +112,7 @@ function mergeAlike(alerts: { alert: AlertDto; lines: LineConfig[] }[], now: num
 }
 
 function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
-  const { title, sub, after } = summary(alert, now);
+  const { title, sub, trains, after } = summary(alert, now);
   const live = !alert.start || alert.start <= now;
   return (
     <section className={`notice${live ? " live" : ""}`}>
@@ -131,6 +133,7 @@ function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
           {after && ` ${after}`}
         </p>
       )}
+      {trains && <p className="notice-sub">{trains}</p>}
       <Calendar alert={alert} now={now} />
       <details>
         <summary>Details</summary>
