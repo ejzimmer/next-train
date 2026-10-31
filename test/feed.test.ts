@@ -270,7 +270,7 @@ describe("partial suspensions", () => {
   it("reads delays and trains turning back early, without closing any track", () => {
     // Metro's wording, 31 October 2026, as the same fault cleared.
     const a = parse(
-      "Hurstbridge Line Delays",
+      "Major Delays - Hurstbridge Line",
       "Delays up to 20 minutes now clearing after an earlier equipment fault in the Eltham area.\n\n" +
         "* Select trains may terminate/originate at Greensborough or/and Eltham.\n" +
         "* Buses may supplement services as we recover the timetable.\n\n" +
