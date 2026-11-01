@@ -281,6 +281,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
         <p className="muted">
           {vehicles.error ? "Live data unavailable, retrying" : stale}
         </p>
+        {!vehicles.error && shownVehicles.some((v) => v.scheduled) && <p className="muted">Live tram data unavailable</p>}
         <p className="muted" aria-live="polite">
           {nearestText(nearest)}
         </p>
