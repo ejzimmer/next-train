@@ -518,7 +518,7 @@ export function LineMap({
               return (
                 <g
                   key={v.id}
-                  className={`train${tram ? " tram" : ""}${!homeLine || v.line === homeLine ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
+                  className={`train${tram ? " tram" : ""}${!homeLine || v.line === homeLine ? "" : " shared"}${age > STALE_AFTER || v.scheduled ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
                   style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)${tram ? " scale(0.55)" : ""}` }}
                   onClick={select}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && select()}

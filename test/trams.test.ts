@@ -63,3 +63,26 @@ describe("trams", () => {
     expect(Math.hypot(pa[0] - pb[0], pa[1] - pb[1])).toBeCloseTo(TRAM_SPACING, 0);
   });
 });
+
+describe("timetabled trams", () => {
+  it("places the trams running now on their route", async () => {
+    const { scheduledTrams, scheduledTrip } = await import("../shared/scheduledTrams");
+    const { tramData } = await import("../shared/lines");
+    const { config, data } = cities.melbourne["tram-96"];
+    // 9am on a weekday the timetable covers.
+    const now = Date.parse("2026-11-11T22:00:00Z") / 1000;
+    const trams = scheduledTrams(config, data, tramData, now);
+    expect(trams.length).toBeGreaterThan(10);
+    for (const t of trams) {
+      expect(t.scheduled).toBe(true);
+      expect(t.segment).toBeGreaterThanOrEqual(0);
+      expect(t.segment).toBeLessThan(config.stations.length - 1);
+      expect(t.fraction).toBeGreaterThanOrEqual(0);
+      expect(t.fraction).toBeLessThanOrEqual(1);
+    }
+    expect(new Set(trams.map((t) => t.direction))).toEqual(new Set(["outbound", "citybound"]));
+    const trip = scheduledTrip(trams[0].tripId, data, now)!;
+    expect(trip.stops.length).toBeGreaterThan(0);
+    expect(trip.stops[0].time).toBeGreaterThanOrEqual(now - 30);
+  });
+});

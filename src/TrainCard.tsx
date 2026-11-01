@@ -75,7 +75,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
           )}
           {showCars && vehicle.carNumbers && <span className="cars-pop">{vehicle.carNumbers.join(" ")}</span>}
         </span>
-        <span className="pid-detail">Updated {ago(now - vehicle.timestamp)}</span>
+        <span className="pid-detail">{vehicle.scheduled ? "Timetabled" : `Updated ${ago(now - vehicle.timestamp)}`}</span>
       </div>
       {next && (
         // The next stop; clicking it shows or hides the rest.

@@ -100,7 +100,7 @@ function fromTimetable(
 }
 
 /** Melbourne's tram routes; every route shares one table of stops. */
-const tramData = tramTimetable as unknown as TramTimetable;
+export const tramData = tramTimetable as unknown as TramTimetable;
 const tramStops: LineData["stations"] = Object.fromEntries(
   Object.entries(TRAM_PLACES).map(([id, p]) => [id, { ...p, stopIds: tramData.stopIds[id] ?? [], platforms: {} }]),
 );
@@ -116,7 +116,7 @@ const trams: Lines = Object.fromEntries(
       generatedAt: tramTimetable.generatedAt,
       stations: tramStops,
       trips,
-      times: { patterns: route.patterns.map((p) => p.stops), trips: route.trips },
+      times: { patterns: route.patterns.map((p) => p.stops), trips: route.trips as unknown as LineTimes["trips"] },
     };
     return [config.id, { config, data }];
   }),

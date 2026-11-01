@@ -89,6 +89,8 @@ export interface VehicleDto {
   cars: number;
   /** The car (or tram) numbers, when the feed gives real ones. */
   carNumbers: string[] | null;
+  /** Placed by the timetable, not a live report (trams, while their live feed has nothing). */
+  scheduled?: boolean;
 }
 
 export interface DepartureDto {

@@ -109,7 +109,32 @@ function build(files: Files) {
   for (const list of tripStops.values()) list.sort((a, b) => a[0] - b[0]);
 
   const network: TramNetworkData = { generatedAt: new Date().toISOString(), stops: {}, routes: [], bends: {} };
-  const timetable: TramTimetable = { generatedAt: network.generatedAt, stopIds: {}, routes: {} };
+  const timetable: TramTimetable = { generatedAt: network.generatedAt, stopIds: {}, services: [], routes: {} };
+
+  // The days each service runs, for timetabled trams when the live feed has none.
+  const days = new Map<string, Set<string>>();
+  const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  for (const c of csv(files, "calendar.txt")) {
+    const set = new Set<string>();
+    const [y, m, d] = [c.start_date.slice(0, 4), c.start_date.slice(4, 6), c.start_date.slice(6)].map(Number);
+    for (let t = Date.UTC(y, m - 1, d); ; t += 86_400_000) {
+      const date = new Date(t).toISOString().slice(0, 10).replace(/-/g, "");
+      if (date > c.end_date) break;
+      if (c[weekdays[new Date(t).getUTCDay()]] === "1") set.add(date);
+    }
+    days.set(c.service_id, set);
+  }
+  for (const d of csv(files, "calendar_dates.txt")) {
+    const set = days.get(d.service_id) ?? new Set<string>();
+    if (d.exception_type === "1") set.add(d.date);
+    else set.delete(d.date);
+    days.set(d.service_id, set);
+  }
+  const serviceIndex = new Map<string, number>();
+  const serviceOf = (id: string) => {
+    if (!serviceIndex.has(id)) serviceIndex.set(id, timetable.services.push([...(days.get(id) ?? [])].sort()) - 1);
+    return serviceIndex.get(id)!;
+  };
   const used = new Set<string>();
 
   for (const route of routes) {
@@ -157,7 +182,7 @@ function build(files: Files) {
       };
       const key = JSON.stringify(pattern);
       if (!patternIndex.has(key)) patternIndex.set(key, tt.patterns.push(pattern) - 1);
-      tt.trips[t.trip_id] = [patternIndex.get(key)!, start];
+      tt.trips[t.trip_id] = [patternIndex.get(key)!, start, serviceOf(t.service_id)];
     }
     timetable.routes[id] = tt;
     console.log(`Route ${id}: ${main.stops.length} stops, ${Object.keys(tt.trips).length} trips, ${tt.patterns.length} patterns`);

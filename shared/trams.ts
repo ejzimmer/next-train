@@ -20,14 +20,16 @@ export interface TramTimetable {
   generatedAt: string;
   /** Each stop's GTFS stop ids, by stop id. */
   stopIds: Record<string, string[]>;
+  /** The days (YYYYMMDD) each service runs; trips name their service by its index here. */
+  services: string[][];
   /** By route number. */
   routes: Record<
     string,
     {
       /** Stops as [stop_sequence, stop_id, seconds after the first], with the way it runs and its headsign. */
       patterns: { dir: Direction; dest: string; stops: [number, string, number][] }[];
-      /** Each trip's pattern and start (seconds after midnight). */
-      trips: Record<string, [number, number]>;
+      /** Each trip's pattern, start (seconds after midnight) and service. */
+      trips: Record<string, [number, number, number]>;
     }
   >;
 }
