@@ -3,6 +3,7 @@ import { cityFeed } from "../../shared/feed";
 import { cities, type Lines } from "../../shared/lines";
 import { CACHE_HEADERS, cityOf, errorResponse } from "../../shared/http";
 import { buildTrip } from "../../shared/trip";
+import { scheduledTrip } from "../../shared/scheduledTrams";
 import type { City } from "../../shared/types";
 
 const platformStations = (lines: Lines) => new Set(Object.values(lines).flatMap(({ config }) => config.platformStations));
@@ -24,7 +25,10 @@ export default async (req: Request) => {
     line = Object.values(lines).find((l) => l.config.switchId === line.config.switchId && id in l.data.trips) ?? line;
   try {
     const feed = await cityFeed(city, "trips");
-    const trip = buildTrip(feed, id, line.config, line.data, PLATFORM_STATIONS[city], Date.now() / 1000);
+    const now = Date.now() / 1000;
+    const trip =
+      buildTrip(feed, id, line.config, line.data, PLATFORM_STATIONS[city], now) ??
+      (line.config.mode === "tram" ? scheduledTrip(id, line.data, now) : null);
     if (!trip) return errorResponse(404, "Trip not running");
     return new Response(JSON.stringify(trip), { headers: CACHE_HEADERS });
   } catch (e) {

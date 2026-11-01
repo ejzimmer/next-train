@@ -9,7 +9,8 @@
     "test": "vitest run",
     "gtfs:melbourne": "tsx scripts/build-gtfs-melbourne.ts",
     "gtfs:sydney": "tsx scripts/build-gtfs-sydney.ts",
-    "gtfs:brisbane": "tsx scripts/build-gtfs-brisbane.ts"
+    "gtfs:brisbane": "tsx scripts/build-gtfs-brisbane.ts",
+    "gtfs:trams": "tsx scripts/build-gtfs-trams.ts"
   },
   "engines": {
     "node": ">=20"

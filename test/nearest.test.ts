@@ -27,3 +27,15 @@ describe("nearest station", () => {
     );
   });
 });
+
+describe("nearest per line", () => {
+  it("gives each line's nearest, the nearest of all first, without repeats", async () => {
+    const { nearestPerLine } = await import("../src/useNearestStation");
+    const here = { lat: -37.81, lon: 144.96 };
+    const a = { lat: -37.811, lon: 144.96 };
+    const b = { lat: -37.82, lon: 144.96 };
+    const c = { lat: -37.83, lon: 144.96 };
+    expect(nearestPerLine(here, [{ b, c }, { a, b }, { b }])).toMatchObject({ id: "a", ids: ["a", "b"] });
+    expect(nearestPerLine(here, [])).toBeNull();
+  });
+});

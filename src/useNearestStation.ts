@@ -23,14 +23,25 @@ export function nearest(here: Place, stations: Record<string, Place | undefined>
 
 export type NearestState =
   | { status: "off" | "locating" | "unavailable" | "denied" }
-  | { status: "found"; id: string; metres: number };
+  /** `id` is the nearest of all; `ids` the nearest on each line, the nearest of all first. */
+  | { status: "found"; id: string; metres: number; ids: string[] };
+
+/** The nearest station on each line (each a set of stations), and the nearest of all. */
+export function nearestPerLine(here: Place, lines: Record<string, Place | undefined>[]) {
+  const found = lines
+    .map((stations) => nearest(here, stations))
+    .filter((f): f is { id: string; metres: number } => !!f)
+    .sort((a, b) => a.metres - b.metres);
+  if (!found.length) return null;
+  return { ...found[0], ids: [...new Set(found.map((f) => f.id))] };
+}
 
 /**
- * The station nearest the device, while `enabled`. Location is only asked for once enabled.
+ * The station nearest the device on each of `lines`, while `enabled`. Location is only asked for once enabled.
  * Watches for movement with low accuracy (wifi and cell towers rather than GPS, which is plenty
  * for picking a station and much easier on the battery), and stops while the tab is hidden.
  */
-export function useNearestStation(enabled: boolean, stations: Record<string, Place | undefined>): NearestState {
+export function useNearestStation(enabled: boolean, stations: Record<string, Place | undefined>[]): NearestState {
   const [state, setState] = useState<NearestState>({ status: "off" });
   // Read when the position comes in, so a change of stations doesn't restart the watch.
   const stationsRef = useRef(stations);
@@ -54,7 +65,7 @@ export function useNearestStation(enabled: boolean, stations: Record<string, Pla
       watch = navigator.geolocation.watchPosition(
         ({ coords }) => {
           last.current = { lat: coords.latitude, lon: coords.longitude };
-          const found = nearest(last.current, stationsRef.current);
+          const found = nearestPerLine(last.current, stationsRef.current);
           if (found) setState({ status: "found", ...found });
         },
         (err) => setState({ status: err.code === err.PERMISSION_DENIED ? "denied" : "unavailable" }),
@@ -77,7 +88,7 @@ export function useNearestStation(enabled: boolean, stations: Record<string, Pla
   // The stations changed: pick again from the last position.
   useEffect(() => {
     if (!enabled || !last.current) return;
-    const found = nearest(last.current, stations);
+    const found = nearestPerLine(last.current, stations);
     setState(found ? { status: "found", ...found } : { status: "locating" });
   }, [enabled, stations]);
 

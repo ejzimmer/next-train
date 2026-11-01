@@ -5,6 +5,7 @@ import brisbaneStations from "../data/brisbane/stations.json";
 import * as melbourne from "../shared/network";
 import * as sydney from "../shared/sydney";
 import * as brisbane from "../shared/brisbane";
+import { routeNumber, TRAM_LINES, TRAM_PLACES, TRAM_STOPS } from "../shared/trams";
 import { TIME_ZONES } from "../shared/time";
 import type { Cartoon } from "./Loading";
 import type { City, LineConfig, SchematicStation } from "../shared/types";
@@ -18,6 +19,8 @@ export interface Switch {
   title: string;
   colour: string;
   textColour: string;
+  /** Tram routes' switches are shown instead of the trains' when trams are chosen. */
+  mode?: "tram";
 }
 
 /** Everything the page needs to draw one city's map. */
@@ -52,18 +55,23 @@ export interface Network {
 const lineSwitches = (lines: LineConfig[]): Switch[] =>
   lines.map((l) => ({ id: l.id, name: l.name, title: `${l.name} line`, colour: l.colour, textColour: l.textColour }));
 
+/** A round button per tram route, with just its number. */
+const tramSwitches = TRAM_LINES.map(
+  (l): Switch => ({ id: l.id, name: routeNumber(l), title: l.name, colour: l.colour, textColour: l.textColour, mode: "tram" }),
+);
+
 export const NETWORKS: Record<City, Network> = {
   melbourne: {
     city: "melbourne",
     name: "Melbourne",
     title: "Metro trains",
-    lines: melbourne.LINES,
-    lineById: melbourne.LINE_BY_ID,
-    stations: melbourne.STATIONS,
-    places: melbourneStations.stations,
-    groupOrder: Object.keys(melbourne.GROUPS),
+    lines: [...melbourne.LINES, ...TRAM_LINES],
+    lineById: { ...melbourne.LINE_BY_ID, ...Object.fromEntries(TRAM_LINES.map((l) => [l.id, l])) },
+    stations: { ...melbourne.STATIONS, ...TRAM_STOPS },
+    places: { ...melbourneStations.stations, ...TRAM_PLACES },
+    groupOrder: [...Object.keys(melbourne.GROUPS), ...TRAM_LINES.map((l) => l.group)],
     edgeOrder: melbourne.EDGE_ORDER,
-    switches: lineSwitches(melbourne.LINES),
+    switches: [...lineSwitches(melbourne.LINES), ...tramSwitches],
     defaultSwitches: ["hurstbridge"],
     homeLine: "hurstbridge",
     cartoon: { model: "xtrapolis", cars: 6 },

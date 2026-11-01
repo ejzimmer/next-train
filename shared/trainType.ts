@@ -24,6 +24,27 @@ export function trainType(vehicleId: string): { type: TrainType | null; cars: nu
   return { type, cars: type === "HCMT" ? 7 : cars.length };
 }
 
+/** Yarra Trams' classes by fleet number. */
+const MELBOURNE_TRAMS: [from: number, to: number, type: string][] = [
+  [115, 230, "Z3-class"],
+  [231, 300, "A-class"],
+  [2001, 2132, "B-class"],
+  [3001, 3036, "C-class"],
+  [3501, 3538, "D1-class"],
+  [5001, 5021, "D2-class"],
+  [5101, 5105, "C2-class"],
+  [6001, 6199, "E-class"],
+  [7001, 7199, "G-class"],
+];
+
+/** A Melbourne tram's class and number, from its vehicle id (the fleet number, possibly with letters around it). */
+export function melbourneTramType(vehicleId: string): { type: string | null; cars: number; carNumbers: string[] | null } {
+  const number = /\d{3,}/.exec(vehicleId)?.[0];
+  const n = Number(number);
+  const type = MELBOURNE_TRAMS.find(([from, to]) => n >= from && n <= to)?.[2] ?? null;
+  return { type, cars: 1, carNumbers: number ? [number] : null };
+}
+
 /** Sydney Trains' vehicle models, from vehicle_categories.txt in its GTFS. */
 const SYDNEY_MODELS: Record<string, string> = {
   A: "Waratah",

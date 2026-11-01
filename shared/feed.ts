@@ -7,16 +7,18 @@ export type FeedMessage = GtfsRealtimeBindings.transit_realtime.FeedMessage;
 
 export type FeedKind = "vehicles" | "trips" | "alerts";
 
-const PTV = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/metro";
+const PTV_REALTIME = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1";
+const PTV = `${PTV_REALTIME}/metro`;
+const YARRA_TRAMS = `${PTV_REALTIME}/tram`;
 const TFNSW = "https://api.transport.nsw.gov.au";
 const TRANSLINK = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ";
 
 /** Each city's feeds of each kind; a city with several (Sydney Trains and each light rail line) has them merged. */
 const FEEDS: Record<City, Record<FeedKind, string[]>> = {
   melbourne: {
-    vehicles: [`${PTV}/vehicle-positions`],
-    trips: [`${PTV}/trip-updates`],
-    alerts: [`${PTV}/service-alerts`],
+    vehicles: [`${PTV}/vehicle-positions`, `${YARRA_TRAMS}/vehicle-positions`],
+    trips: [`${PTV}/trip-updates`, `${YARRA_TRAMS}/trip-updates`],
+    alerts: [`${PTV}/service-alerts`, `${YARRA_TRAMS}/service-alerts`],
   },
   sydney: {
     vehicles: [
@@ -96,6 +98,41 @@ export async function cityFeed(city: City, kind: FeedKind): Promise<FeedMessage>
     },
     entity: feeds.flatMap((f) => f.entity),
   });
+}
+
+/**
+ * What each of a city's feeds of one kind sent, for checking a new feed works (/api/vehicles?debug=1): whether it
+ * arrived, how many entities, and a few of them in brief. Nothing secret.
+ */
+export async function feedSummary(city: City, kind: FeedKind) {
+  const auth = KEYS[city];
+  const key = auth && process.env[auth.env];
+  const headers = auth && key ? auth.header(key) : {};
+  return Promise.all(
+    FEEDS[city][kind].map(async (url) => {
+      const feed = url.split("/").slice(-2).join("/");
+      try {
+        const f = await fetchFeed(url, headers);
+        return {
+          feed,
+          timestamp: toNum(f.header.timestamp),
+          entities: f.entity.length,
+          sample: f.entity.slice(0, 3).map((e) => ({
+            id: e.id,
+            vehicle: e.vehicle && {
+              trip: e.vehicle.trip,
+              vehicle: e.vehicle.vehicle,
+              position: e.vehicle.position,
+              timestamp: toNum(e.vehicle.timestamp),
+            },
+            tripUpdate: e.tripUpdate && { trip: e.tripUpdate.trip, stops: e.tripUpdate.stopTimeUpdate?.slice(0, 2) },
+          })),
+        };
+      } catch (err) {
+        return { feed, error: String(err) };
+      }
+    }),
+  );
 }
 
 /** protobufjs gives uint64 fields as Long objects; everything we read fits in a double. */

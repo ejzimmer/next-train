@@ -1,6 +1,7 @@
 import type { Config } from "@netlify/functions";
-import { cityFeed } from "../../shared/feed";
-import { cities, type Lines } from "../../shared/lines";
+import { cityFeed, feedSummary } from "../../shared/feed";
+import { cities, tramData, type Lines } from "../../shared/lines";
+import { scheduledTrams } from "../../shared/scheduledTrams";
 import { buildVehicles, startOf, type PlacedVehicle } from "../../shared/vehicles";
 import { CACHE_HEADERS, cityOf, errorResponse } from "../../shared/http";
 import type { VehicleDto, VehiclesResponse } from "../../shared/types";
@@ -14,13 +15,27 @@ export default async (req: Request) => {
   const city = cityOf(req);
   if (!city) return errorResponse(404, "Unknown city");
   try {
+    if (new URL(req.url).searchParams.has("debug")) {
+      const feed = await cityFeed(city, "vehicles");
+      const placed = Object.values(cities[city]).map(({ config, data }) => [config.id, buildVehicles(feed, config, data).vehicles.length]);
+      const body = {
+        feeds: await feedSummary(city, "vehicles"),
+        trips: await feedSummary(city, "trips"),
+        alerts: (await feedSummary(city, "alerts")).map(({ feed, ...f }) => ({ feed, ...("error" in f ? f : { entities: f.entities }) })),
+        placed: Object.fromEntries(placed),
+      };
+      return new Response(JSON.stringify(body, null, 1), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    }
     const feed = await cityFeed(city, "vehicles");
     const lines = cities[city];
     const perLine = Object.values(lines).map(({ config, data }) => buildVehicles(feed, config, data));
-    const body: VehiclesResponse = {
-      feedTimestamp: perLine[0]?.feedTimestamp ?? 0,
-      vehicles: newestPerTrain(perLine.flatMap((r) => r.vehicles), lines),
-    };
+    const vehicles = newestPerTrain(perLine.flatMap((r) => r.vehicles), lines);
+    // A tram route the live feed has nothing on gets its trams from the timetable.
+    const live = new Set(vehicles.map((v) => v.line));
+    const now = Math.floor(Date.now() / 1000);
+    for (const { config, data } of Object.values(lines))
+      if (config.mode === "tram" && !live.has(config.id)) vehicles.push(...scheduledTrams(config, data, tramData, now));
+    const body: VehiclesResponse = { feedTimestamp: perLine[0]?.feedTimestamp ?? 0, vehicles };
     return new Response(JSON.stringify(body), { headers: CACHE_HEADERS });
   } catch (e) {
     return errorResponse(502, String(e));

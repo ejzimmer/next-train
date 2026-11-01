@@ -24,7 +24,7 @@ export interface SchematicStation {
 export interface LineConfig {
   id: string;
   city: City;
-  mode: "metro-train" | "train" | "light-rail";
+  mode: "metro-train" | "train" | "light-rail" | "tram";
   name: string;
   /** The switch that shows the line: the line's own, or one shared by a line's branches (Sydney's T1, say). */
   switchId: string;
@@ -89,6 +89,8 @@ export interface VehicleDto {
   cars: number;
   /** The car (or tram) numbers, when the feed gives real ones. */
   carNumbers: string[] | null;
+  /** Placed by the timetable, not a live report (trams, while their live feed has nothing). */
+  scheduled?: boolean;
 }
 
 export interface DepartureDto {
