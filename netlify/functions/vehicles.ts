@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { cityFeed } from "../../shared/feed";
+import { cityFeed, feedSummary } from "../../shared/feed";
 import { cities, type Lines } from "../../shared/lines";
 import { buildVehicles, startOf, type PlacedVehicle } from "../../shared/vehicles";
 import { CACHE_HEADERS, cityOf, errorResponse } from "../../shared/http";
@@ -14,6 +14,12 @@ export default async (req: Request) => {
   const city = cityOf(req);
   if (!city) return errorResponse(404, "Unknown city");
   try {
+    if (new URL(req.url).searchParams.has("debug")) {
+      const feed = await cityFeed(city, "vehicles");
+      const placed = Object.values(cities[city]).map(({ config, data }) => [config.id, buildVehicles(feed, config, data).vehicles.length]);
+      const body = { feeds: await feedSummary(city, "vehicles"), placed: Object.fromEntries(placed) };
+      return new Response(JSON.stringify(body, null, 1), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+    }
     const feed = await cityFeed(city, "vehicles");
     const lines = cities[city];
     const perLine = Object.values(lines).map(({ config, data }) => buildVehicles(feed, config, data));

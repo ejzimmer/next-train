@@ -100,6 +100,41 @@ export async function cityFeed(city: City, kind: FeedKind): Promise<FeedMessage>
   });
 }
 
+/**
+ * What each of a city's feeds of one kind sent, for checking a new feed works (/api/vehicles?debug=1): whether it
+ * arrived, how many entities, and a few of them in brief. Nothing secret.
+ */
+export async function feedSummary(city: City, kind: FeedKind) {
+  const auth = KEYS[city];
+  const key = auth && process.env[auth.env];
+  const headers = auth && key ? auth.header(key) : {};
+  return Promise.all(
+    FEEDS[city][kind].map(async (url) => {
+      const feed = url.split("/").slice(-2).join("/");
+      try {
+        const f = await fetchFeed(url, headers);
+        return {
+          feed,
+          timestamp: toNum(f.header.timestamp),
+          entities: f.entity.length,
+          sample: f.entity.slice(0, 3).map((e) => ({
+            id: e.id,
+            vehicle: e.vehicle && {
+              trip: e.vehicle.trip,
+              vehicle: e.vehicle.vehicle,
+              position: e.vehicle.position,
+              timestamp: toNum(e.vehicle.timestamp),
+            },
+            tripUpdate: e.tripUpdate && { trip: e.tripUpdate.trip, stops: e.tripUpdate.stopTimeUpdate?.slice(0, 2) },
+          })),
+        };
+      } catch (err) {
+        return { feed, error: String(err) };
+      }
+    }),
+  );
+}
+
 /** protobufjs gives uint64 fields as Long objects; everything we read fits in a double. */
 export function toNum(v: number | { toString(): string } | null | undefined): number {
   if (v == null) return 0;

@@ -45,7 +45,8 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
         : line.city === "brisbane"
           ? { type: null, cars: 0, carNumbers: null }
           : { ...trainType(id), carNumbers: id.split("-") };
-    const timestamp = toNum(v.timestamp);
+    // A report without its own time is as old as the feed.
+    const timestamp = toNum(v.timestamp) || toNum(feed.header.timestamp);
     // The same train can be reported against its old and next trip: keep the newer report, or
     // when both carry the same time, the later-starting trip, so the map doesn't flip between them.
     const existing = byId.get(id);
