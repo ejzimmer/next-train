@@ -124,7 +124,11 @@ function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
     <section className={`notice${live ? " live" : ""}`}>
       <ul className="notice-lines">
         {lines.map((l) => (
-          <li key={l.id} style={{ background: l.colour, color: l.textColour }}>
+          <li
+            key={l.id}
+            className={network.city === "sydney" ? `pictogram${l.id.startsWith("l") ? " round" : ""}` : undefined}
+            style={{ background: l.colour, color: l.textColour }}
+          >
             {l.name}
           </li>
         ))}
@@ -165,7 +169,7 @@ function savedCollapsed() {
   }
 }
 
-/** All the disruptions on one board, styled after Metro's station posters. The orange bar folds it away. */
+/** All the disruptions on one board, styled after Metro's station posters (Sydney's after its platform displays). The orange bar folds it away. */
 export function Disruptions({ alerts, now }: Props) {
   const network = useNetwork();
   const [collapsed, setCollapsed] = useState(savedCollapsed);
@@ -181,7 +185,7 @@ export function Disruptions({ alerts, now }: Props) {
   const notices = mergeAlike(alerts, now, network);
   const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
   return (
-    <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
+    <aside className={`disruptions ${network.city}${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
       <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">
         <span className="bang" aria-hidden>
           !
