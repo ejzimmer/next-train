@@ -129,7 +129,7 @@ function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
             className={network.city === "sydney" ? `pictogram${l.id.startsWith("l") ? " round" : ""}` : undefined}
             style={{ background: l.colour, color: l.textColour }}
           >
-            {l.name}
+            {network.city === "sydney" ? <span>{l.name}</span> : l.name}
           </li>
         ))}
       </ul>

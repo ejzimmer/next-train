@@ -254,7 +254,9 @@ footer { margin-top: 24px; }
   flex: none; display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 0.28em;
   font-weight: 700; letter-spacing: -0.04em; line-height: 1;
 }
-.pictogram.round { border-radius: 50%; }
+.pictogram.round { border-radius: 50%; width: 2.1em; height: 2.1em; }
+/* Cap height centred, not the line box, so the letters sit in the middle of small pictograms too. */
+.pictogram > span { display: block; text-box: trim-both cap alphabetic; }
 .syd-next { display: flex; align-items: center; gap: 12px; margin: 0 14px; padding: 12px 0 10px; border-bottom: 2px solid #000; }
 .syd-next .pictogram { font-size: 1.45rem; }
 .syd-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -266,7 +268,7 @@ footer { margin-top: 24px; }
 .syd-value { font-size: 1.4rem; line-height: 1.1; white-space: nowrap; }
 .syd-following { margin: 0 14px; padding: 6px 0 8px; }
 .syd-row { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 1.1rem; }
-.syd-row .pictogram { font-size: 0.8rem; }
+.syd-row .pictogram { font-size: 0.85rem; }
 .syd-row-dest { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .syd-row-plat { min-width: 2em; text-align: center; }
 .syd-row-mins { min-width: 4.2em; text-align: right; white-space: nowrap; }
@@ -282,6 +284,7 @@ footer { margin-top: 24px; }
 .disruptions.sydney .notice { border-bottom: 2px solid #000; }
 .disruptions.sydney .notice:last-of-type { border-bottom: none; }
 .disruptions.sydney .notice-lines li.pictogram { width: 2em; height: 2em; padding: 0; font-size: 0.8rem; }
+.disruptions.sydney .notice-lines li.pictogram.round { width: 2.2em; height: 2.2em; }
 .disruptions.sydney .notice-lines li.pictogram:not(.round) { border-radius: 0.28em; }
 .disruptions.sydney .notice h2 { font-weight: 500; letter-spacing: -0.03em; }
 .disruptions.sydney .notice-sub { font-weight: 400; }

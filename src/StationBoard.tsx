@@ -106,7 +106,7 @@ export function LinePictogram({ lineId }: { lineId: string }) {
   const label = switches.find((s) => s.id === line.switchId)?.name ?? line.name;
   return (
     <span className={`pictogram${line.mode === "light-rail" ? " round" : ""}`} style={{ background: line.colour, color: line.textColour }}>
-      {label}
+      <span>{label}</span>
     </span>
   );
 }
