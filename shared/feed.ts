@@ -10,6 +10,10 @@ export type FeedKind = "vehicles" | "trips" | "alerts";
 const PTV_REALTIME = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1";
 const PTV = `${PTV_REALTIME}/metro`;
 const YARRA_TRAMS = `${PTV_REALTIME}/tram`;
+/** PTV's other realtime feeds, not on the map: only checked on the debug summary, to see what the key can read. */
+export const OTHER_PTV_FEEDS = ["bus", "vline"].flatMap((mode) =>
+  ["vehicle-positions", "trip-updates", "service-alerts"].map((kind) => `${PTV_REALTIME}/${mode}/${kind}`),
+);
 const TFNSW = "https://api.transport.nsw.gov.au";
 const TRANSLINK = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ";
 
@@ -104,12 +108,12 @@ export async function cityFeed(city: City, kind: FeedKind): Promise<FeedMessage>
  * What each of a city's feeds of one kind sent, for checking a new feed works (/api/vehicles?debug=1): whether it
  * arrived, how many entities, and a few of them in brief. Nothing secret.
  */
-export async function feedSummary(city: City, kind: FeedKind) {
+export async function feedSummary(city: City, kind: FeedKind, urls = FEEDS[city][kind]) {
   const auth = KEYS[city];
   const key = auth && process.env[auth.env];
   const headers = auth && key ? auth.header(key) : {};
   return Promise.all(
-    FEEDS[city][kind].map(async (url) => {
+    urls.map(async (url) => {
       const feed = url.split("/").slice(-2).join("/");
       try {
         const f = await fetchFeed(url, headers);

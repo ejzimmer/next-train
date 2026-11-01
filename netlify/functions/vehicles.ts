@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { cityFeed, feedSummary } from "../../shared/feed";
+import { cityFeed, feedSummary, OTHER_PTV_FEEDS } from "../../shared/feed";
 import { cities, tramData, type Lines } from "../../shared/lines";
 import { scheduledTrams } from "../../shared/scheduledTrams";
 import { buildVehicles, startOf, type PlacedVehicle } from "../../shared/vehicles";
@@ -22,6 +22,9 @@ export default async (req: Request) => {
         feeds: await feedSummary(city, "vehicles"),
         trips: await feedSummary(city, "trips"),
         alerts: (await feedSummary(city, "alerts")).map(({ feed, ...f }) => ({ feed, ...("error" in f ? f : { entities: f.entities }) })),
+        other: city === "melbourne"
+          ? (await feedSummary(city, "vehicles", OTHER_PTV_FEEDS)).map(({ feed, ...f }) => ({ feed, ...("error" in f ? f : { entities: f.entities }) }))
+          : [],
         placed: Object.fromEntries(placed),
       };
       return new Response(JSON.stringify(body, null, 1), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
