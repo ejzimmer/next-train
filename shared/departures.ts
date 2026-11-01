@@ -2,6 +2,7 @@ import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
 import { isLineRoute } from "./routes";
 import { resolveUpdates } from "./schedule";
+import { TIME_ZONES } from "./time";
 import type { DepartureDto, DeparturesResponse, Direction, LineConfig, LineData, LineTimes } from "./types";
 
 const { TripDescriptor, TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -53,7 +54,7 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
     if (!tu || !tripId || !isLineRoute(tu.trip?.routeId, line)) continue;
     const cancelled = tu.trip.scheduleRelationship === TripDescriptor.ScheduleRelationship.CANCELED;
 
-    const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip?.startDate, now);
+    const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip?.startDate, now, TIME_ZONES[line.city]);
     const stops = withScheduledGaps(resolved, data.times, tripId)
       .map((u) => ({ u, index: stationOf.get(u.stopId ?? "") }))
       .filter((s): s is { u: (typeof s)["u"]; index: number } => s.index != null);

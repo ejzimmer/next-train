@@ -1,5 +1,6 @@
 import { progress } from "../shared/routes";
 import type { DepartureDto, LineConfig, VehicleDto } from "../shared/types";
+import { dateFormat, TIME_ZONES } from "../shared/time";
 import { useNetwork } from "./networks";
 
 interface Props {
@@ -13,15 +14,12 @@ interface Props {
   onClose: () => void;
 }
 
-const clock = new Intl.DateTimeFormat("en-AU", {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-  timeZone: "Australia/Melbourne",
-});
-
-/** "2:52 pm" → "2:52pm", as the platform displays write it. */
-export const formatTime = (unix: number) => clock.format(unix * 1000).replace(/\s/g, "").toLowerCase();
+/** "2:52 pm" → "2:52pm", as the platform displays write it, in the city's time zone. */
+export const formatTime = (unix: number, timeZone: string) =>
+  dateFormat("en-AU", timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+    .format(unix * 1000)
+    .replace(/\s/g, "")
+    .toLowerCase();
 
 function minutes(time: number, now: number) {
   const mins = Math.floor((time - now) / 60);
@@ -58,7 +56,7 @@ function stillDue(d: DepartureDto, stationId: string, vehicles: VehicleDto[], no
 
 /** The "following trains" list from a Metro platform display, each row in its line's colour. */
 export function StationBoard({ stationId, colour, departures, vehicles, now, onClose }: Props) {
-  const { stations, lineById, city } = useNetwork();
+  const { stations, lineById, timeZone, city } = useNetwork();
   // A destination off the line (e.g. a Stony Point train running on) is already a name.
   const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const stationName = name(stationId);
@@ -78,7 +76,7 @@ export function StationBoard({ stationId, colour, departures, vehicles, now, onC
       ) : (
         upcoming.map((d) => (
           <div key={d.tripId} className={`pid-row${d.cancelled ? " cancelled" : ""}`} style={{ borderLeftColor: lineById[d.line]?.colour }}>
-            <span className="pid-time">{formatTime(d.time)}</span>
+            <span className="pid-time">{formatTime(d.time, timeZone)}</span>
             <span className="pid-dest">{name(d.destination)}</span>
             {d.platform && <span className="pid-detail">Plat {d.platform}</span>}
             <span className="pid-mins">{d.cancelled ? "Cancelled" : minutes(d.time, now)}</span>
@@ -89,14 +87,8 @@ export function StationBoard({ stationId, colour, departures, vehicles, now, onC
   );
 }
 
-const sydneyClock = new Intl.DateTimeFormat("en-AU", {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-  timeZone: "Australia/Sydney",
-});
 /** "2:52", as Sydney's displays write it. */
-const sydneyTime = (unix: number) => sydneyClock.format(unix * 1000).replace(/\s?[ap]m$/i, "");
+const sydneyTime = (unix: number) => formatTime(unix, TIME_ZONES.sydney).replace(/[ap]m$/, "");
 
 /** A line's pictogram: a rounded square for trains, a circle for light rail. */
 export function LinePictogram({ lineId }: { lineId: string }) {

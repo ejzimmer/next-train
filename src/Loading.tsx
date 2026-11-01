@@ -3,7 +3,7 @@ import { useNetwork } from "./networks";
 const CAR = 104;
 
 /** Which cartoon train a city's screens show. */
-export type Cartoon = "xtrapolis" | "waratah";
+export type Cartoon = "xtrapolis" | "waratah" | "ngr";
 
 /**
  * One cartoon X'Trapolis 100 car in Metro livery. Driving cars (`cab`) have the yellow cab on the right;
@@ -103,6 +103,48 @@ export function WaratahCar({ x, cab, flip }: { x: number; cab?: boolean; flip?: 
   );
 }
 
+/**
+ * One cartoon Queensland Rail NGR car: white, with a dark band along the windows and plug doors in pairs.
+ * Driving cars (`cab`) have the dark sloped nose with a yellow front on the right; pass `flip` for the left.
+ */
+export function NgrCar({ x, cab, flip }: { x: number; cab?: boolean; flip?: boolean }) {
+  const body = cab ? "M0,8 H82 Q96,9 100,24 L102,44 Q102,48 98,48 H0 Z" : "M0,8 H104 V48 H0 Z";
+  const end = cab ? 82 : CAR;
+  const doors = cab ? [14, 56] : [18, 72];
+  return (
+    <g transform={flip ? `translate(${x + CAR} 0) scale(-1 1)` : `translate(${x} 0)`}>
+      <path d={body} className="ngr-body" />
+      <rect x={0} y={8} width={end} height={3} className="xt-roof" />
+      <rect x={0} y={15} width={end} height={14} className="ngr-band" />
+      {doors.map((dx) => (
+        <g key={dx}>
+          <rect x={dx} y={13} width={14} height={34} rx={1} className="ngr-door" />
+          <rect x={dx + 2} y={16} width={4} height={12} rx={1} className="xt-windows" />
+          <rect x={dx + 8} y={16} width={4} height={12} rx={1} className="xt-windows" />
+        </g>
+      ))}
+      {cab && (
+        <>
+          <path d="M82,8 Q96,9 100,24 L102,44 Q102,48 98,48 H82 Z" className="ngr-nose" />
+          <path d="M84,12 Q94,13 97,24 H84 Z" className="xt-windows" />
+          <path d="M86,34 H101.5 L102,44 Q102,48 98,48 H86 Z" className="xt-cab" />
+          <circle cx={97} cy={40} r={1.8} className="xt-light" />
+        </>
+      )}
+      {[16, CAR - 16].map((bx) => (
+        <g key={bx}>
+          {[-6, 6].map((dx) => (
+            <g key={dx} className="xt-wheel" style={{ transformOrigin: `${bx + dx}px 52px` }}>
+              <circle cx={bx + dx} cy={52} r={4.5} />
+              <line x1={bx + dx - 3} x2={bx + dx + 3} y1={52} y2={52} />
+            </g>
+          ))}
+        </g>
+      ))}
+    </g>
+  );
+}
+
 /** A three-car set: a driving car at each end with a trailer between. */
 export function Set({ x }: { x: number }) {
   return (
@@ -116,7 +158,7 @@ export function Set({ x }: { x: number }) {
 
 const SET = 3 * CAR + 6;
 
-/** X'Trapolis trains are three-car sets coupled together; a Waratah is one eight-car unit. */
+/** X'Trapolis trains are three-car sets coupled together; a Waratah is one eight-car unit, an NGR one six-car unit. */
 const inSets = (cars: number, model: Cartoon) => model === "xtrapolis" && cars % 3 === 0;
 
 /** How wide a train of `cars` cars is drawn. */
@@ -126,7 +168,7 @@ export const trainWidth = (cars: number, model: Cartoon = "xtrapolis") =>
 /** A train of `cars` cars: three-car sets coupled together, or one unit with a driving car at each end. */
 export function Train({ cars, model = "xtrapolis" }: { cars: number; model?: Cartoon }) {
   if (inSets(cars, model)) return <>{Array.from({ length: cars / 3 }, (_, i) => <Set key={i} x={i * (SET + 4)} />)}</>;
-  const Unit = model === "waratah" ? WaratahCar : Car;
+  const Unit = model === "waratah" ? WaratahCar : model === "ngr" ? NgrCar : Car;
   return (
     <>
       {Array.from({ length: cars }, (_, i) => (

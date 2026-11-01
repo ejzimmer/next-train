@@ -2,6 +2,7 @@ import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
 import { withScheduledGaps } from "./departures";
 import { nearestServiceMidnight, resolveUpdates, serviceMidnight, stationsByStop } from "./schedule";
+import { TIME_ZONES } from "./time";
 import type { LineConfig, LineData, TripDto } from "./types";
 
 const { TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -40,9 +41,10 @@ export function buildTrip(
   const timed = data.times?.trips[tripId];
   const pattern = timed ? data.times!.patterns[timed[0]] : [];
   const scheduled = new Map(pattern.map(([seq, , offset]) => [seq, timed![1] + offset]));
-  const midnight = serviceMidnight(tu.trip.startDate) ?? (timed ? nearestServiceMidnight(timed[1], now) : null);
+  const timeZone = TIME_ZONES[line.city];
+  const midnight = serviceMidnight(tu.trip.startDate, timeZone) ?? (timed ? nearestServiceMidnight(timed[1], now, timeZone) : null);
 
-  const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip.startDate, now);
+  const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip.startDate, now, timeZone);
   const updates = withScheduledGaps(resolved, data.times, tripId);
   const stops: TripDto["stops"] = [];
   let delay: number | null = null;

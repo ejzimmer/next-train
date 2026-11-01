@@ -69,6 +69,11 @@ main { position: relative; }
 .train.stopped { fill: #0072ce; stroke: #ffd400; }
 .train.stale { fill: #c9c9c9; stroke: #7a8a99; }
 .board-anchor { position: absolute; z-index: 2; }
+/* On phones: one spot above the map, kept on screen while the page scrolls. Room round it for the close button. */
+.board-dock {
+  position: sticky; top: 0; z-index: 3; max-height: 50dvh; overflow-y: auto;
+  margin: 0 -16px 8px; padding: 16px 16px 8px; background: var(--bg);
+}
 
 /* The "following trains" list from a Metro platform display. */
 .pid {
@@ -171,6 +176,10 @@ footer { margin-top: 24px; }
 .wt-body { fill: #d5dade; stroke: #4d5866; stroke-width: 1; }
 .wt-door { fill: #bcc3ca; stroke: #6b7682; stroke-width: 0.6; }
 .wt-door-gap { stroke: #6b7682; stroke-width: 0.6; }
+.ngr-body { fill: #f7f8f9; stroke: #4d5866; stroke-width: 1; }
+.ngr-band { fill: #2b3138; }
+.ngr-door { fill: #e9ecef; stroke: #6b7682; stroke-width: 0.6; }
+.ngr-nose { fill: #2b3138; stroke: #4d5866; stroke-width: 1; }
 .xt-wheel circle { fill: #333; }
 .xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
 .xt-wheel { animation: xt-spin 0.7s linear infinite; }

@@ -1,5 +1,6 @@
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum } from "./feed";
+import { dateFormat, TIME_ZONES } from "./time";
 import type { LineData } from "./types";
 
 const { TripUpdate } = GtfsRealtimeBindings.transit_realtime;
@@ -17,17 +18,19 @@ export function stationsByStop(data: LineData) {
   return map;
 }
 
-// Melbourne and Sydney keep the same time, daylight saving included.
-const localHour = new Intl.DateTimeFormat("en-AU", { timeZone: "Australia/Melbourne", hour: "numeric", hourCycle: "h23" });
-const localDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Australia/Melbourne", year: "numeric", month: "2-digit", day: "2-digit" });
+const localHour = (timeZone: string) => dateFormat("en-AU", timeZone, { hour: "numeric", hourCycle: "h23" });
+const localDate = (timeZone: string) => dateFormat("en-CA", timeZone, { year: "numeric", month: "2-digit", day: "2-digit" });
 
-/** Unix seconds at noon minus 12 hours, local time, on a GTFS service date (YYYYMMDD): what GTFS times count from. */
-export function serviceMidnight(date: string | null | undefined): number | null {
+/**
+ * Unix seconds at noon minus 12 hours, local time (Melbourne's unless `timeZone` is given), on a GTFS
+ * service date (YYYYMMDD): what GTFS times count from.
+ */
+export function serviceMidnight(date: string | null | undefined, timeZone = TIME_ZONES.melbourne): number | null {
   const m = date?.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (!m) return null;
   const noonUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], 12);
   // The offset at noon that day, from how the date reads there.
-  const parts = localHour.formatToParts(noonUtc);
+  const parts = localHour(timeZone).formatToParts(noonUtc);
   const hour = Number(parts.find((p) => p.type === "hour")!.value);
   const offset = (((hour - 12) % 24) + 24) % 24;
   return noonUtc / 1000 - (offset + 12) * 3600;
@@ -37,8 +40,10 @@ export function serviceMidnight(date: string | null | undefined): number | null 
  * When the feed doesn't give a trip's service date (Sydney Trains doesn't), the one that puts the trip's
  * scheduled start (seconds after midnight) nearest to now.
  */
-export function nearestServiceMidnight(start: number, now: number): number {
-  const candidates = [-1, 0, 1].map((days) => serviceMidnight(localDate.format((now + days * 86400) * 1000).replace(/-/g, ""))!);
+export function nearestServiceMidnight(start: number, now: number, timeZone = TIME_ZONES.melbourne): number {
+  const candidates = [-1, 0, 1].map(
+    (days) => serviceMidnight(localDate(timeZone).format((now + days * 86400) * 1000).replace(/-/g, ""), timeZone)!,
+  );
   return candidates.reduce((best, m) => (Math.abs(m + start - now) < Math.abs(best + start - now) ? m : best));
 }
 
@@ -55,13 +60,14 @@ export function resolveUpdates(
   tripId: string,
   startDate: string | null | undefined,
   now: number,
+  timeZone = TIME_ZONES.melbourne,
 ): StopTimeUpdate[] {
   const trip = data.times?.trips[tripId];
   if (!trip || updates.every((u) => u.stopSequence && hasTime(u))) return updates;
   const [patternIndex, start] = trip;
   const pattern = data.times!.patterns[patternIndex];
   const station = stationsByStop(data);
-  const midnight = serviceMidnight(startDate) ?? nearestServiceMidnight(start, now);
+  const midnight = serviceMidnight(startDate, timeZone) ?? nearestServiceMidnight(start, now, timeZone);
   let from = 0;
   return updates.map((u) => {
     let k = u.stopSequence ? pattern.findIndex(([seq]) => seq === u.stopSequence) : -1;
