@@ -1,6 +1,6 @@
 export type Direction = "citybound" | "outbound";
 
-export type City = "melbourne" | "sydney";
+export type City = "melbourne" | "sydney" | "brisbane";
 
 export interface SchematicStation {
   id: string;
@@ -18,7 +18,7 @@ export interface SchematicStation {
 }
 
 /**
- * A line on a network map (shared/network.ts, shared/sydney.ts). Stations are listed city end first, or
+ * A line on a network map (shared/network.ts, shared/sydney.ts, shared/brisbane.ts). Stations are listed city end first, or
  * from one end to the other on lines through the city; "outbound" is always the way the list runs.
  */
 export interface LineConfig {
@@ -35,6 +35,11 @@ export interface LineConfig {
   group: string;
   /** Substrings matched against GTFS-R route_id, e.g. "-HBE:" for aus:vic:vic-02-HBE: */
   routeIdMatch: string[];
+  /** A regular expression matched against route_id, where substrings won't do (Brisbane's "FGBN-5212"). */
+  routeIdPattern?: string;
+  /** When given, alerts are the line's only if they name a route matching this, not just any of its routes:
+   * a Brisbane alert naming Cleveland–Shorncliffe trains is about the Shorncliffe line, not Cleveland. */
+  alertRoutePattern?: string;
   /** First and last station of the City Loop section, skipped when trains run direct to Flinders Street. */
   cityLoop?: [string, string];
   /** Stations whose departures show a platform number. */

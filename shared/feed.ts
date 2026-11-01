@@ -9,6 +9,7 @@ export type FeedKind = "vehicles" | "trips" | "alerts";
 
 const PTV = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/metro";
 const TFNSW = "https://api.transport.nsw.gov.au";
+const TRANSLINK = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ";
 
 /** Each city's feeds of each kind; a city with several (Sydney Trains and each light rail line) has them merged. */
 const FEEDS: Record<City, Record<FeedKind, string[]>> = {
@@ -32,12 +33,19 @@ const FEEDS: Record<City, Record<FeedKind, string[]>> = {
     ],
     alerts: [`${TFNSW}/v2/gtfs/alerts/sydneytrains`, `${TFNSW}/v2/gtfs/alerts/lightrail`],
   },
+  // Translink's rail feeds; alerts are only given for every mode at once.
+  brisbane: {
+    vehicles: [`${TRANSLINK}/VehiclePositions/Rail`],
+    trips: [`${TRANSLINK}/TripUpdates/Rail`],
+    alerts: [`${TRANSLINK}/Alerts`],
+  },
 };
 
-/** The API key's environment variable and how it's sent. */
-const KEYS: Record<City, { env: string; header: (key: string) => Record<string, string> }> = {
+/** The API key's environment variable and how it's sent; Translink's feeds don't need one. */
+const KEYS: Record<City, { env: string; header: (key: string) => Record<string, string> } | null> = {
   melbourne: { env: "PTV_OPENDATA_KEY", header: (key) => ({ KeyID: key }) },
   sydney: { env: "TFNSW_OPENDATA_KEY", header: (key) => ({ Authorization: `apikey ${key}` }) },
+  brisbane: null,
 };
 
 export function decodeFeed(bytes: Uint8Array): FeedMessage {
@@ -73,10 +81,11 @@ export function fetchFeed(url: string, headers: Record<string, string>): Promise
  * say), unless they all do. The timestamp is the newest feed's.
  */
 export async function cityFeed(city: City, kind: FeedKind): Promise<FeedMessage> {
-  const { env, header } = KEYS[city];
-  const key = process.env[env];
-  if (!key) throw new Error(`${env} is not set`);
-  const results = await Promise.allSettled(FEEDS[city][kind].map((url) => fetchFeed(url, header(key))));
+  const auth = KEYS[city];
+  const key = auth && process.env[auth.env];
+  if (auth && !key) throw new Error(`${auth.env} is not set`);
+  const headers = auth ? auth.header(key!) : {};
+  const results = await Promise.allSettled(FEEDS[city][kind].map((url) => fetchFeed(url, headers)));
   const feeds = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
   if (!feeds.length) throw (results[0] as PromiseRejectedResult).reason;
   if (feeds.length === 1) return feeds[0];

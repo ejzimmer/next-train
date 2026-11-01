@@ -1,19 +1,17 @@
-const parts = new Intl.DateTimeFormat("en-AU", {
-  timeZone: "Australia/Melbourne",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  hourCycle: "h23",
-});
+import { dateFormat, TIME_ZONES } from "../shared/time";
 
-/** Melbourne date ("2026-10-23") and hour for a unix time. */
-function local(unix: number) {
-  const p = Object.fromEntries(parts.formatToParts(unix * 1000).map((x) => [x.type, x.value]));
+const parts = (timeZone: string) =>
+  dateFormat("en-AU", timeZone, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+
+/** The city's date ("2026-10-23") and hour for a unix time. */
+function local(unix: number, timeZone: string) {
+  const p = Object.fromEntries(parts(timeZone).formatToParts(unix * 1000).map((x) => [x.type, x.value]));
   return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
 }
 
 const STEP = 30 * 60;
+/** Disruptions ending further ahead than this are shown like open-ended ones. */
+const LONG = 5 * 7 * 24 * 3600;
 /** Trains running after midnight belong to the previous day's service, as on Metro's posters. */
 const SERVICE_DAY_ENDS = 4;
 
@@ -23,15 +21,20 @@ export type DayKind = "all-day" | "night";
  * Which days a disruption touches, and whether it's only at night (as on Metro's "after 8.30pm" posters)
  * or covers the daytime too.
  */
-export function disruptedDays(periods: { start: number | null; end: number | null }[], now: number) {
+export function disruptedDays(
+  periods: { start: number | null; end: number | null }[],
+  now: number,
+  timeZone = TIME_ZONES.melbourne,
+) {
   const days = new Map<string, DayKind>();
   for (const p of periods) {
-    const start = p.start ?? now;
-    // Open-ended alerts: show the coming week.
-    const end = p.end ?? now + 7 * 24 * 3600;
+    // From today: days already gone aren't shown.
+    const start = Math.max(p.start ?? now, now);
+    // Open-ended alerts, and ones running for months (Brisbane's reduced timetables), show the coming week.
+    const end = p.end == null || p.end > now + LONG ? now + 7 * 24 * 3600 : p.end;
     for (let t = start; t < end; t += STEP) {
-      const { date } = local(t - SERVICE_DAY_ENDS * 3600);
-      const { hour } = local(t);
+      const { date } = local(t - SERVICE_DAY_ENDS * 3600, timeZone);
+      const { hour } = local(t, timeZone);
       const daytime = hour >= 9 && hour < 17;
       if (daytime) days.set(date, "all-day");
       else if (!days.has(date)) days.set(date, "night");

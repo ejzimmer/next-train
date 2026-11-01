@@ -1,8 +1,11 @@
 import { createContext, useContext } from "react";
 import melbourneStations from "../data/stations.json";
 import sydneyStations from "../data/sydney/stations.json";
+import brisbaneStations from "../data/brisbane/stations.json";
 import * as melbourne from "../shared/network";
 import * as sydney from "../shared/sydney";
+import * as brisbane from "../shared/brisbane";
+import { TIME_ZONES } from "../shared/time";
 import type { Cartoon } from "./Loading";
 import type { City, LineConfig, SchematicStation } from "../shared/types";
 
@@ -41,7 +44,13 @@ export interface Network {
   cartoon: { model: Cartoon; cars: number };
   /** Where an alert's link goes, for its "More on ..." text. */
   alertsSite: string;
+  /** Times are shown in the city's own time. */
+  timeZone: string;
 }
+
+/** A switch for each line, as in Melbourne and Brisbane. */
+const lineSwitches = (lines: LineConfig[]): Switch[] =>
+  lines.map((l) => ({ id: l.id, name: l.name, title: `${l.name} line`, colour: l.colour, textColour: l.textColour }));
 
 export const NETWORKS: Record<City, Network> = {
   melbourne: {
@@ -54,13 +63,14 @@ export const NETWORKS: Record<City, Network> = {
     places: melbourneStations.stations,
     groupOrder: Object.keys(melbourne.GROUPS),
     edgeOrder: melbourne.EDGE_ORDER,
-    switches: melbourne.LINES.map((l) => ({ id: l.id, name: l.name, title: `${l.name} line`, colour: l.colour, textColour: l.textColour })),
+    switches: lineSwitches(melbourne.LINES),
     defaultSwitches: ["hurstbridge"],
     homeLine: "hurstbridge",
     cartoon: { model: "xtrapolis", cars: 6 },
     attribution:
       "Source: Licensed from Public Transport Victoria under a Creative Commons Attribution 4.0 International Licence. Not affiliated with PTV.",
     alertsSite: "transport.vic.gov.au",
+    timeZone: TIME_ZONES.melbourne,
   },
   sydney: {
     city: "sydney",
@@ -78,6 +88,26 @@ export const NETWORKS: Record<City, Network> = {
     cartoon: { model: "waratah", cars: 8 },
     attribution: "Source: Transport for NSW Open Data, under a Creative Commons Attribution 4.0 International Licence. Not affiliated with Transport for NSW.",
     alertsSite: "transportnsw.info",
+    timeZone: TIME_ZONES.sydney,
+  },
+  brisbane: {
+    city: "brisbane",
+    name: "Brisbane",
+    title: "Trains",
+    lines: brisbane.LINES,
+    lineById: brisbane.LINE_BY_ID,
+    stations: brisbane.STATIONS,
+    places: brisbaneStations.stations,
+    groupOrder: Object.keys(brisbane.GROUPS),
+    edgeOrder: brisbane.EDGE_ORDER,
+    switches: lineSwitches(brisbane.LINES),
+    defaultSwitches: ["airport"],
+    homeLine: null,
+    cartoon: { model: "ngr", cars: 6 },
+    attribution:
+      "Source: Translink, Department of Transport and Main Roads, under a Creative Commons Attribution 4.0 International Licence. Not affiliated with Translink.",
+    alertsSite: "translink.com.au",
+    timeZone: TIME_ZONES.brisbane,
   },
 };
 

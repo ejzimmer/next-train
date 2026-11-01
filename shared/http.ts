@@ -10,7 +10,7 @@ export const CACHE_HEADERS = {
 /** The request's ?city=, Melbourne when it's left out. Null for a city we don't have. */
 export function cityOf(req: Request): City | null {
   const city = new URL(req.url).searchParams.get("city") ?? "melbourne";
-  return city === "melbourne" || city === "sydney" ? city : null;
+  return city === "melbourne" || city === "sydney" || city === "brisbane" ? city : null;
 }
 
 export function errorResponse(status: number, message: string) {
