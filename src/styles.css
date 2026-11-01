@@ -69,6 +69,11 @@ main { position: relative; }
 .train.stopped { fill: #0072ce; stroke: #ffd400; }
 .train.stale { fill: #c9c9c9; stroke: #7a8a99; }
 .board-anchor { position: absolute; z-index: 2; }
+/* On phones: one spot above the map, kept on screen while the page scrolls. Room round it for the close button. */
+.board-dock {
+  position: sticky; top: 0; z-index: 3; max-height: 50dvh; overflow-y: auto;
+  margin: 0 -16px 8px; padding: 16px 16px 8px; background: var(--bg);
+}
 
 /* The "following trains" list from a Metro platform display. */
 .pid {
