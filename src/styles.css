@@ -248,7 +248,7 @@ footer { margin-top: 24px; }
 /* After a Sydney Trains platform display: an orange bar (red for light rail), the next service large, then the rest. */
 .syd-pid {
   --syd-bar: #e65010;
-  position: relative; background: #f8f8f8; color: #000; border-radius: 4px; overflow: visible;
+  position: relative; background: #f8f8f8; color: #000; border-radius: 4px; overflow: visible; font-family: "Public Sans", system-ui, sans-serif;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3); letter-spacing: -0.03em; font-weight: 500;
 }
 .syd-pid.light-rail { --syd-bar: #e61e30; }
@@ -283,18 +283,31 @@ footer { margin-top: 24px; }
 .syd-row-mins { min-width: 4.2em; text-align: right; white-space: nowrap; }
 .syd-next.cancelled .syd-dest, .syd-next.cancelled .syd-time, .syd-row.cancelled .syd-row-dest { text-decoration: line-through; color: #888; }
 
-/* Sydney's disruptions, in the Sydney Trains display's orange, black rules and line pictograms. */
-.disruptions.sydney { border-radius: 4px; background: #f8f8f8; color: #000; letter-spacing: -0.02em; }
+/* Sydney's disruptions, after the orange disruption screens at Sydney stations: a band in each line's colour,
+   a white headline with a no-entry or warning sign, and white rules between notices. */
+.disruptions.sydney {
+  --syd-orange: #f3631b;
+  border-radius: 4px; background: var(--syd-orange); color: #fff; font-family: "Public Sans", system-ui, sans-serif;
+}
 .disruptions.sydney::after { display: none; }
-.disruptions.sydney .disruptions-bar { background: #e65010; }
-.disruptions.sydney .disruptions-bar:hover { background: #cf460c; }
-.disruptions.sydney .bang { color: #e65010; }
-.disruptions.sydney .disruptions-body { padding: 4px 16px 10px; }
-.disruptions.sydney .notice { border-bottom: 2px solid #000; }
-.disruptions.sydney .notice:last-of-type { border-bottom: none; }
-.disruptions.sydney .notice-lines li.pictogram { width: 2em; height: 2em; padding: 0; font-size: 0.8rem; }
-.disruptions.sydney .notice-lines li.pictogram.round { width: 2.2em; height: 2.2em; }
-.disruptions.sydney .notice-lines li.pictogram:not(.round) { border-radius: 0.28em; }
-.disruptions.sydney .notice h2 { font-weight: 500; letter-spacing: -0.03em; }
-.disruptions.sydney .notice-sub { font-weight: 400; }
-.disruptions.sydney .cal-day.all-day, .disruptions.sydney .cal-day.night { background: #e65010; font-weight: 500; }
+.disruptions.sydney .disruptions-bar { background: var(--syd-orange); }
+.disruptions.sydney .disruptions-bar:hover { background: #e2560f; }
+.disruptions.sydney .bang { color: var(--syd-orange); }
+.disruptions.sydney .disruptions-body { padding: 0 0 12px; }
+.disruptions.sydney .notice { padding: 12px 0 10px; border-bottom: none; }
+.disruptions.sydney .notice::before { content: ""; display: block; height: 2px; margin: 0 0 10px 16px; background: #fff; }
+.line-band { display: flex; align-items: center; gap: 8px; padding: 3px 16px; margin-bottom: 4px; font-weight: 700; font-size: 1rem; }
+.pictogram.outline { width: 1.9em; height: 1.9em; font-size: 0.85rem; border: 2px solid currentColor; box-sizing: border-box; }
+.pictogram.outline.round { width: 2.1em; height: 2.1em; }
+.notice-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 4px 16px 0; }
+.disruptions.sydney .notice h2 { font-size: 2rem; font-weight: 500; line-height: 1.05; letter-spacing: -0.02em; }
+.disruptions.sydney .notice-after { font-weight: 500; }
+.disruptions.sydney .notice-sub { margin: 4px 0 4px; font-size: 1.1rem; font-weight: 500; }
+.notice-icon { flex: none; width: 44px; height: 44px; margin-top: 4px; color: #fff; }
+.disruptions.sydney .cal, .disruptions.sydney details, .disruptions.sydney .cal-key { margin-left: 16px; margin-right: 16px; }
+.disruptions.sydney .cal { margin-top: 10px; }
+.disruptions.sydney .cal-head, .disruptions.sydney .notice details summary, .disruptions.sydney .cal-key { color: #fff; }
+.disruptions.sydney .cal-day { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.disruptions.sydney .cal-day.all-day, .disruptions.sydney .cal-day.night { background: #fff; color: var(--syd-orange); font-weight: 700; }
+.disruptions.sydney .notice a { color: #fff; }
+.disruptions.sydney .cal-key { padding-top: 4px; }

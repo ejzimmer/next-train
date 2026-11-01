@@ -116,32 +116,74 @@ function mergeAlike(alerts: { alert: AlertDto; lines: Switch[] }[], now: number,
   return notices;
 }
 
+/** As on Sydney's displays: a no-entry sign when trains aren't running, a warning triangle otherwise. */
+function NoticeIcon({ kind }: { kind: AlertDto["kind"] }) {
+  return kind === "buses" || kind === "suspended" ? (
+    <svg className="notice-icon" viewBox="0 0 48 48" aria-hidden>
+      <circle cx={24} cy={24} r={20} fill="none" stroke="currentColor" strokeWidth={5} />
+      <path d="M10 38L38 10" stroke="currentColor" strokeWidth={5} />
+    </svg>
+  ) : (
+    <svg className="notice-icon" viewBox="0 0 48 48" aria-hidden>
+      <path d="M24 4L46 43H2Z" fill="currentColor" strokeLinejoin="round" />
+      <path d="M24 17v14" stroke="#f3631b" strokeWidth={5} strokeLinecap="round" />
+      <circle cx={24} cy={37} r={2.8} fill="#f3631b" />
+    </svg>
+  );
+}
+
 function Notice({ alert, lines, descriptions, now }: Merged & { now: number }) {
   const network = useNetwork();
   const { title, sub, after } = summary(alert, now, network);
   const live = !alert.start || alert.start <= now;
   return (
     <section className={`notice${live ? " live" : ""}`}>
-      <ul className="notice-lines">
-        {lines.map((l) => (
-          <li
-            key={l.id}
-            className={network.city === "sydney" ? `pictogram${l.id.startsWith("l") ? " round" : ""}` : undefined}
-            style={{ background: l.colour, color: l.textColour }}
-          >
-            {network.city === "sydney" ? <span>{l.name}</span> : l.name}
-          </li>
-        ))}
-      </ul>
-      <h2>
-        {title}
-        {!sub && after && <span className="notice-after"> {after}</span>}
-      </h2>
-      {sub && (
-        <p className="notice-sub">
-          {sub}
-          {after && ` ${after}`}
-        </p>
+      {network.city === "sydney" ? (
+        <>
+          {lines.map((l) => (
+            <div key={l.id} className="line-band" style={{ background: l.colour, color: l.textColour }}>
+              <span className={`pictogram outline${l.id.startsWith("l") ? " round" : ""}`}>
+                <span>{l.name}</span>
+              </span>
+              {l.title.replace(/^[TL]\d+\s+/, "")}
+            </div>
+          ))}
+          <div className="notice-head">
+            <div>
+              <h2>
+                {title}
+                {!sub && after && <span className="notice-after"> {after}</span>}
+              </h2>
+              {sub && (
+                <p className="notice-sub">
+                  {sub}
+                  {after && ` ${after}`}
+                </p>
+              )}
+            </div>
+            <NoticeIcon kind={alert.kind} />
+          </div>
+        </>
+      ) : (
+        <>
+          <ul className="notice-lines">
+            {lines.map((l) => (
+              <li key={l.id} style={{ background: l.colour, color: l.textColour }}>
+                {l.name}
+              </li>
+            ))}
+          </ul>
+          <h2>
+            {title}
+            {!sub && after && <span className="notice-after"> {after}</span>}
+          </h2>
+          {sub && (
+            <p className="notice-sub">
+              {sub}
+              {after && ` ${after}`}
+            </p>
+          )}
+        </>
       )}
       <Calendar alert={alert} now={now} />
       <details>
