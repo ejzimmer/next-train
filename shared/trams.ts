@@ -11,6 +11,8 @@ export interface TramNetworkData {
   stops: Record<string, { name: string; lat: number; lon: number; x: number; y: number }>;
   /** In route number order. `stops` run outbound (GTFS direction 0). */
   routes: { id: string; routeId: string; name: string; colour: string; textColour: string; stops: string[] }[];
+  /** Bends in the drawn line between two neighbouring stops, keyed "from>to"; reversed when read "to>from". */
+  bends: Record<string, [number, number][]>;
 }
 
 /** What only the functions need, kept out of the page. */
@@ -30,7 +32,11 @@ export interface TramTimetable {
   >;
 }
 
-const data = network as TramNetworkData;
+const data = network as unknown as TramNetworkData;
+
+function bendsBetween(a: string, b: string): [number, number][] {
+  return data.bends[`${a}>${b}`] ?? [...(data.bends[`${b}>${a}`] ?? [])].reverse();
+}
 
 export const TRAM_LINES: LineConfig[] = data.routes.map((r) => ({
   id: `tram-${r.id}`,
@@ -46,9 +52,10 @@ export const TRAM_LINES: LineConfig[] = data.routes.map((r) => ({
   routeIdPattern: `(^|-)${r.id}:?$`,
   alertRoutePattern: `(^|-)${r.id}:?$`,
   platformStations: [],
-  stations: r.stops.map((id): SchematicStation => {
+  stations: r.stops.map((id, i): SchematicStation => {
     const s = data.stops[id];
-    return { id, name: s.name, x: s.x, y: s.y, label: "r" };
+    const via = i > 0 ? bendsBetween(r.stops[i - 1], id) : [];
+    return { id, name: s.name, x: s.x, y: s.y, label: "r", ...(via.length && { via }) };
   }),
   track: [],
 }));

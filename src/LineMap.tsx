@@ -44,8 +44,8 @@ interface Props {
   closedStretches: { line: string; from: string; to: string }[];
   now: number;
   selected: string | null;
-  /** The station nearest the device, when the viewer has asked for it. */
-  nearest: string | null;
+  /** The station nearest the device on each line shown, when the viewer has asked for them. */
+  nearest: string[];
   onSelect: (stationId: string) => void;
   /** The trip whose card is open, shown beside its train instead of a station's board. */
   selectedTrain: string | null;
@@ -462,12 +462,12 @@ export function LineMap({
               return (
                 <g
                   key={s.id}
-                  className={`station${s.tram ? " tram" : ""}${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
+                  className={`station${s.tram ? " tram" : ""}${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest.includes(s.id) ? " nearest" : ""}`}
                   onClick={() => onSelect(s.id)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
                   role="button"
                   tabIndex={0}
-                  aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
+                  aria-label={nearest.includes(s.id) ? `${s.name}, nearest to you` : s.name}
                   aria-pressed={selected === s.id}
                   style={{ ["--line" as string]: colour }}
                 >
@@ -480,7 +480,7 @@ export function LineMap({
                     strokeWidth={s.tram ? 10 : 28}
                     strokeLinecap="round"
                   />
-                  {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={(s.tram ? 6 : 12) + half} />}
+                  {nearest.includes(s.id) && <circle className="station-here" cx={cx} cy={cy} r={(s.tram ? 6 : 12) + half} />}
                   {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
                   <line
                     className="station-rim"

@@ -16,6 +16,7 @@ import stations from "../data/stations.json";
 import { STATIONS } from "../shared/network";
 import type { TramNetworkData, TramTimetable } from "../shared/trams";
 import { csv, eachStopTime, load, type Files } from "./gtfs";
+import { straightLines } from "./tram-layout";
 
 const DEFAULT_SOURCE = "https://data.ptv.vic.gov.au/downloads/gtfs.zip";
 const TRAM_FOLDER = "3";
@@ -107,7 +108,7 @@ function build(files: Files) {
   });
   for (const list of tripStops.values()) list.sort((a, b) => a[0] - b[0]);
 
-  const network: TramNetworkData = { generatedAt: new Date().toISOString(), stops: {}, routes: [] };
+  const network: TramNetworkData = { generatedAt: new Date().toISOString(), stops: {}, routes: [], bends: {} };
   const timetable: TramTimetable = { generatedAt: network.generatedAt, stopIds: {}, routes: {} };
   const used = new Set<string>();
 
@@ -176,6 +177,13 @@ function build(files: Files) {
     };
     timetable.stopIds[id] = members.map((m) => m.stop_id);
   }
+  // Straightened into a diagram like the trains'.
+  const laid = straightLines(
+    Object.fromEntries(Object.entries(network.stops).map(([id, s]) => [id, [s.x, s.y]])),
+    network.routes.map((r) => r.stops),
+  );
+  for (const [id, [x, y]] of Object.entries(laid.at)) Object.assign(network.stops[id], { x, y });
+  network.bends = laid.bends;
   // Ordered by route number, as on the buttons.
   network.routes.sort((a, b) => Number(a.id) - Number(b.id));
 

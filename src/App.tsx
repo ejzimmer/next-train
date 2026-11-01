@@ -191,7 +191,11 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
       .filter((a) => a.stretch && (!a.start || a.start <= now))
       .map((a) => ({ line: l.id, ...a.stretch! })),
   );
-  const places = useMemo(() => Object.fromEntries([...onMap].map((id) => [id, network.places[id]])), [onMap, network]);
+  // Each line's stations, so the nearest on every line can be shown.
+  const places = useMemo(
+    () => lines.map((l) => Object.fromEntries(l.stations.map((s) => [s.id, network.places[s.id]]))),
+    [lines, network],
+  );
 
   const select = useCallback((id: string | null) => {
     setSelectedTrain(null);
@@ -205,6 +209,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
   const [showNearest, setShowNearest] = useState(savedShowNearest);
   const nearest = useNearestStation(showNearest, places);
   const nearestId = nearest.status === "found" ? nearest.id : null;
+  const nearestIds = useMemo(() => (nearest.status === "found" ? nearest.ids : []), [nearest]);
   const toggleNearest = (on: boolean) => {
     setShowNearest(on);
     try {
@@ -294,7 +299,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
             closedStretches={closedStretches}
             now={now}
             selected={station}
-            nearest={nearestId}
+            nearest={nearestIds}
             onSelect={select}
             selectedTrain={cardVehicle ? selectedTrain : null}
             onSelectTrain={selectTrain}
