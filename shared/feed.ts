@@ -7,16 +7,18 @@ export type FeedMessage = GtfsRealtimeBindings.transit_realtime.FeedMessage;
 
 export type FeedKind = "vehicles" | "trips" | "alerts";
 
-const PTV = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1/metro";
+const PTV_REALTIME = "https://api.opendata.transport.vic.gov.au/opendata/public-transport/gtfs/realtime/v1";
+const PTV = `${PTV_REALTIME}/metro`;
+const YARRA_TRAMS = `${PTV_REALTIME}/tram`;
 const TFNSW = "https://api.transport.nsw.gov.au";
 const TRANSLINK = "https://gtfsrt.api.translink.com.au/api/realtime/SEQ";
 
 /** Each city's feeds of each kind; a city with several (Sydney Trains and each light rail line) has them merged. */
 const FEEDS: Record<City, Record<FeedKind, string[]>> = {
   melbourne: {
-    vehicles: [`${PTV}/vehicle-positions`],
-    trips: [`${PTV}/trip-updates`],
-    alerts: [`${PTV}/service-alerts`],
+    vehicles: [`${PTV}/vehicle-positions`, `${YARRA_TRAMS}/vehicle-positions`],
+    trips: [`${PTV}/trip-updates`, `${YARRA_TRAMS}/trip-updates`],
+    alerts: [`${PTV}/service-alerts`, `${YARRA_TRAMS}/service-alerts`],
   },
   sydney: {
     vehicles: [

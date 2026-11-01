@@ -1,6 +1,6 @@
 # next-train: live train map
 
-A schematic map of Melbourne's Metro train lines, of Sydney Trains and Sydney light rail, and of Brisbane's trains, showing where each
+A schematic map of Melbourne's Metro train lines and trams, of Sydney Trains and Sydney light rail, and of Brisbane's trains, showing where each
 train is right now, with next departures for any station you click. Each city has its own tab. Each line can be
 switched on and off; lines sharing track are drawn side by side, as on the network maps. Data comes from Transport
 Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
@@ -31,6 +31,9 @@ Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
    month ahead and its trip ids change with each version.
 5. Brisbane needs no key. `.github/workflows/brisbane-timetable.yml` runs `npm run gtfs:brisbane` every week and
    commits `data/brisbane/`, as Translink publishes a new timetable (with new trip ids) most weeks.
+6. Melbourne's trams use the same key as the trains. `.github/workflows/tram-timetable.yml` runs `npm run gtfs:trams`
+   every week and commits `data/trams/`. Tram stops aren't laid out by hand: the script bends their real positions to
+   fit the train schematic (a thin-plate spline through the train stations), so each route passes the right stations.
 
 ## Development
 

@@ -24,7 +24,7 @@ export interface SchematicStation {
 export interface LineConfig {
   id: string;
   city: City;
-  mode: "metro-train" | "train" | "light-rail";
+  mode: "metro-train" | "train" | "light-rail" | "tram";
   name: string;
   /** The switch that shows the line: the line's own, or one shared by a line's branches (Sydney's T1, say). */
   switchId: string;

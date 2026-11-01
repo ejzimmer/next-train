@@ -31,6 +31,7 @@ function ago(secs: number) {
 export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard, onClose }: Props) {
   const { city, lineById, stations, timeZone } = useNetwork();
   const line = lineById[vehicle.line];
+  const tram = line?.mode === "tram";
   const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const trip = usePoll<TripDto>(
     `/api/trip?id=${encodeURIComponent(vehicle.tripId)}&line=${encodeURIComponent(vehicle.line)}&city=${city}`,
@@ -57,7 +58,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
   };
 
   return (
-    <div className="pid train-card" role="dialog" aria-label="Train details" style={{ borderTopColor: line?.colour }}>
+    <div className="pid train-card" role="dialog" aria-label={tram ? "Tram details" : "Train details"} style={{ borderTopColor: line?.colour }}>
       <button className="pid-close" onClick={onClose} aria-label="Close">
         ×
       </button>
@@ -102,10 +103,10 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
       <div className="train-card-buttons">
         <button
           className="card-button primary"
-          style={{ ["--line" as string]: line?.colour }}
+          style={{ ["--line" as string]: line?.colour, ["--line-text" as string]: line?.textColour }}
           onClick={() => onBoard(!boarded)}
         >
-          {boarded ? "Detrain" : "Board train"}
+          {tram ? (boarded ? "Alight" : "Board tram") : boarded ? "Detrain" : "Board train"}
         </button>
         <span className="share">
           <button className="card-button" onClick={share}>

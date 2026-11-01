@@ -1,7 +1,7 @@
 import { toNum, type FeedMessage } from "./feed";
 import { directionFromBearing, placeOnLine, segmentBearing } from "./position";
-import { isLineRoute } from "./routes";
-import { sydneyTrainType, trainType } from "./trainType";
+import { isLineTrip } from "./routes";
+import { melbourneTramType, sydneyTrainType, trainType } from "./trainType";
 import type { LineConfig, LineData, VehicleDto, VehiclesResponse } from "./types";
 
 /** Trains further than this from the line (in metres) are left off the map. */
@@ -25,7 +25,7 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
   for (const entity of feed.entity) {
     const v = entity.vehicle;
     const tripId = v?.trip?.tripId;
-    if (!v?.position || !tripId || !isLineRoute(v.trip?.routeId, line)) continue;
+    if (!v?.position || !tripId || !isLineTrip(v.trip, line, data)) continue;
     const placed = placeOnLine(v.position.latitude, v.position.longitude, line, data);
     if (!placed || placed.offLine > MAX_OFF_LINE) continue;
     const segment = placed.segment;
@@ -38,7 +38,9 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
     const id = v.vehicle?.id || entity.id;
     // Translink's vehicle ids aren't car numbers, and its feed doesn't say which trains they are.
     const { type, cars, carNumbers } =
-      line.city === "sydney"
+      line.mode === "tram"
+        ? melbourneTramType(id)
+        : line.city === "sydney"
         ? sydneyTrainType(entity, line)
         : line.city === "brisbane"
           ? { type: null, cars: 0, carNumbers: null }

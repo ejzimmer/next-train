@@ -40,6 +40,17 @@ body { margin: 0; background: var(--bg); }
 .line-switch:hover { background: var(--highlight); }
 .line-switch[aria-pressed="true"] { background: var(--line); color: var(--line-text); }
 .line-switch:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
+/* Tram routes: a round button with just the number. */
+.line-switches.trams .line-switch {
+  min-width: 34px; height: 34px; padding: 0 4px; border-radius: 17px; font-weight: 600; font-variant-numeric: tabular-nums;
+}
+.mode-switch { display: inline-flex; gap: 2px; margin: 0 0 8px; padding: 2px; border-radius: 8px; background: var(--highlight); }
+.mode-tab {
+  font: inherit; font-size: 0.85rem; padding: 3px 12px; border: none; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.mode-tab[aria-selected="true"] { background: var(--bg); color: var(--fg); }
+.mode-tab:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
 .muted { color: var(--muted); font-size: 0.85rem; }
 .warning { background: #fff3cd; color: #5c4400; padding: 8px 12px; border-radius: 6px; }
 main { position: relative; }
@@ -63,6 +74,9 @@ main { position: relative; }
 .station:hover text, .station:focus-visible text { filter: url(#label-bg); }
 .station:hover .station-dot, .station:focus-visible .station-dot, .station.selected .station-dot { stroke: var(--line); }
 .station:focus { outline: none; }
+/* Tram stops are small, and named only when pointed at or chosen. */
+.station.tram text { display: none; font-size: 12px; }
+.station.tram:hover text, .station.tram:focus-visible text, .station.tram.selected text, .station.tram.nearest text { display: inline; }
 /* "You are here": a blue ring around the nearest station. */
 .station-here { fill: rgba(0, 114, 206, 0.18); stroke: #0072ce; stroke-width: 2; }
 .train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
@@ -88,6 +102,7 @@ main { position: relative; }
 .pid-row:last-child { border-bottom: none; }
 .pid-time { min-width: 4.6em; font-size: 0.95rem; }
 .pid-dest { flex: 1; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pid-route { min-width: 2em; font-weight: 700; font-variant-numeric: tabular-nums; }
 .pid-detail { color: #555; font-size: 0.85rem; white-space: nowrap; }
 .pid-mins { background: #000; color: #fff; padding: 2px 8px; min-width: 4em; text-align: center; white-space: nowrap; }
 .pid-row.cancelled .pid-time, .pid-row.cancelled .pid-dest { text-decoration: line-through; color: #888; }
@@ -202,7 +217,7 @@ footer { margin-top: 24px; }
 }
 .card-button:hover { background: #e3e6ea; }
 /* Board/Detrain, in the train's line colour. */
-.card-button.primary { background: var(--line); color: #fff; }
+.card-button.primary { background: var(--line); color: var(--line-text, #fff); }
 .card-button.primary:hover { filter: brightness(0.9); }
 .card-button:focus-visible { outline: 2px solid #0072ce; outline-offset: 2px; }
 .share { position: relative; display: inline-flex; align-items: center; }

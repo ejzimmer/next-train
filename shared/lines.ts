@@ -37,7 +37,9 @@ import werribeeTrips from "../data/werribee.trips.json";
 import werribeeTimes from "../data/werribee.times.json";
 import williamstownTrips from "../data/williamstown.trips.json";
 import williamstownTimes from "../data/williamstown.times.json";
+import tramTimetable from "../data/trams/timetable.json";
 import { LINES } from "./network";
+import { TRAM_LINES, TRAM_PLACES, routeNumber, type TramTimetable } from "./trams";
 import { LINES as SYDNEY_LINES } from "./sydney";
 import { LINES as BRISBANE_LINES } from "./brisbane";
 import type { City, LineConfig, LineData, LineTimes } from "./types";
@@ -97,7 +99,30 @@ function fromTimetable(
   );
 }
 
+/** Melbourne's tram routes; every route shares one table of stops. */
+const tramData = tramTimetable as unknown as TramTimetable;
+const tramStops: LineData["stations"] = Object.fromEntries(
+  Object.entries(TRAM_PLACES).map(([id, p]) => [id, { ...p, stopIds: tramData.stopIds[id] ?? [], platforms: {} }]),
+);
+const trams: Lines = Object.fromEntries(
+  TRAM_LINES.map((config) => {
+    const route = tramData.routes[routeNumber(config)] ?? { patterns: [], trips: {} };
+    const trips: LineData["trips"] = {};
+    for (const [tripId, [pattern]] of Object.entries(route.trips)) {
+      const { dir, dest } = route.patterns[pattern];
+      trips[tripId] = { dir, dest };
+    }
+    const data: LineData = {
+      generatedAt: tramTimetable.generatedAt,
+      stations: tramStops,
+      trips,
+      times: { patterns: route.patterns.map((p) => p.stops), trips: route.trips },
+    };
+    return [config.id, { config, data }];
+  }),
+);
+
 const sydney = fromTimetable(SYDNEY_LINES, sydneyStations, sydneyTimetable);
 const brisbane = fromTimetable(BRISBANE_LINES, brisbaneStations, brisbaneTimetable);
 
-export const cities: Record<City, Lines> = { melbourne: lines, sydney, brisbane };
+export const cities: Record<City, Lines> = { melbourne: { ...lines, ...trams }, sydney, brisbane };

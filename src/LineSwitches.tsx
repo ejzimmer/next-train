@@ -4,6 +4,9 @@ import { useNetwork } from "./networks";
 interface Props {
   on: string[];
   onToggle: (id: string) => void;
+  /** Which buttons show, where a city has trams as well as trains. */
+  mode: "train" | "tram";
+  onMode: (mode: "train" | "tram") => void;
 }
 
 const GAP = 6;
@@ -25,8 +28,10 @@ function rowsAt(widths: number[], width: number) {
  * A button per line, filled in the line's colour while it's on the map. When they wrap, the row is
  * narrowed as far as it goes without adding a row, so the rows come out about the same length.
  */
-export function LineSwitches({ on, onToggle }: Props) {
-  const { switches } = useNetwork();
+export function LineSwitches({ on, onToggle, mode, onMode }: Props) {
+  const network = useNetwork();
+  const hasTrams = network.switches.some((s) => s.mode === "tram");
+  const switches = network.switches.filter((s) => (s.mode ?? "train") === (hasTrams ? mode : "train"));
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const [maxWidth, setMaxWidth] = useState<number>();
@@ -50,11 +55,20 @@ export function LineSwitches({ on, onToggle }: Props) {
     const observer = new ResizeObserver(balance);
     if (outer.current) observer.observe(outer.current);
     return () => observer.disconnect();
-  }, [switches]);
+  }, [switches.length, mode]);
 
   return (
     <div ref={outer}>
-      <div className="line-switches" ref={inner} style={{ maxWidth }}>
+      {hasTrams && (
+        <div className="mode-switch" role="tablist" aria-label="Show buttons for">
+          {(["train", "tram"] as const).map((m) => (
+            <button key={m} className="mode-tab" role="tab" aria-selected={mode === m} onClick={() => onMode(m)}>
+              {m === "train" ? "Trains" : "Trams"}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className={`line-switches${hasTrams && mode === "tram" ? " trams" : ""}`} ref={inner} style={{ maxWidth }}>
         {switches.map((line) => {
           const pressed = on.includes(line.id);
           return (

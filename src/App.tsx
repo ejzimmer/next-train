@@ -25,6 +25,17 @@ function trainFromUrl() {
 }
 
 const NEAREST_KEY = "showNearest";
+/** Whether the train lines' or the tram routes' buttons are showing (Melbourne). */
+const MODE_KEY = "switchMode";
+type Mode = "train" | "tram";
+
+function savedMode(): Mode {
+  try {
+    return localStorage.getItem(MODE_KEY) === "tram" ? "tram" : "train";
+  } catch {
+    return "train";
+  }
+}
 const CITY_KEY = "city";
 /** Each city's switches that are on; Melbourne's key is from before there were other cities. */
 const linesKey = (city: City) => (city === "melbourne" ? "lines" : `lines:${city}`);
@@ -121,6 +132,15 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
       // Not remembered; fine.
     }
   };
+  const [mode, setMode] = useState(savedMode);
+  const chooseMode = (next: Mode) => {
+    setMode(next);
+    try {
+      localStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Not remembered; fine.
+    }
+  };
   const onLine = useMemo(() => new Set(lines.map((l) => l.id)), [lines]);
   const onMap = useMemo(() => new Set(lines.flatMap((l) => l.stations.map((s) => s.id))), [lines]);
   const station = selected && onMap.has(selected) ? selected : null;
@@ -139,6 +159,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
     );
     if (!v) return setLinked("finished");
     setLineIds([network.lineById[v.line].switchId]);
+    if (network.lineById[v.line].mode === "tram") setMode("tram");
     setBoarded(v.tripId);
     setLinked("found");
   }, [linked, linkedTrip, vehicles.data, network]);
@@ -227,12 +248,16 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
   if (linked === "finished") return <TripFinished />;
 
   const switchesOn = network.switches.filter((s) => lineIds.includes(s.id));
+  const tramsOn = switchesOn.some((s) => s.mode === "tram");
+  const trainsOn = switchesOn.some((s) => !s.mode);
+  const title =
+    switchesOn.length === 1 ? switchesOn[0].title : tramsOn && trainsOn ? "Trains and trams" : tramsOn ? "Trams" : network.title;
   return (
     <div className="app">
       <header className="top">
         <CityTabs city={city} onCity={onCity} />
         <div className="title-row">
-          <h1>{switchesOn.length === 1 ? switchesOn[0].title : network.title}</h1>
+          <h1>{title}</h1>
           <button
             className="icon-button locate"
             aria-pressed={showNearest}
@@ -254,7 +279,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
         <p className="muted" aria-live="polite">
           {nearestText(nearest)}
         </p>
-        <LineSwitches on={lineIds} onToggle={toggleLine} />
+        <LineSwitches on={lineIds} onToggle={toggleLine} mode={mode} onMode={chooseMode} />
       </header>
       <Disruptions alerts={shownAlerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs:{city}).</p>}
