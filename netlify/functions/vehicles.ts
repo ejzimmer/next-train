@@ -17,7 +17,12 @@ export default async (req: Request) => {
     if (new URL(req.url).searchParams.has("debug")) {
       const feed = await cityFeed(city, "vehicles");
       const placed = Object.values(cities[city]).map(({ config, data }) => [config.id, buildVehicles(feed, config, data).vehicles.length]);
-      const body = { feeds: await feedSummary(city, "vehicles"), placed: Object.fromEntries(placed) };
+      const body = {
+        feeds: await feedSummary(city, "vehicles"),
+        trips: await feedSummary(city, "trips"),
+        alerts: (await feedSummary(city, "alerts")).map(({ feed, ...f }) => ({ feed, ...("error" in f ? f : { entities: f.entities }) })),
+        placed: Object.fromEntries(placed),
+      };
       return new Response(JSON.stringify(body, null, 1), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
     }
     const feed = await cityFeed(city, "vehicles");
