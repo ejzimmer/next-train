@@ -14,8 +14,9 @@ const NOTICE_EFFECTS = new Set(["OTHER_EFFECT", "UNKNOWN_EFFECT", "NO_EFFECT", "
  * (also "...between Heidelberg to Greensborough"). The stations are read off the line, as the sentence carries on after them. */
 const BUSES = /buses replace trains between /gi;
 
-/** Line suspended without buses, e.g. "Hurstbridge line suspended between Eltham and Hurstbridge". */
-const SUSPENDED = /(?:suspended|no trains(?: run)?) between /gi;
+/** Line suspended without buses, e.g. "Hurstbridge line suspended between Eltham and Hurstbridge",
+ * "trains will not run between Northgate and Shorncliffe stations" (Brisbane). */
+const SUSPENDED = /(?:suspended|no trains(?: run)?|trains will not run) between /gi;
 
 /** Delays, e.g. "Delays up to 20 minutes now clearing after an earlier equipment fault". */
 const DELAYS = /delays (?:of )?up to (\d+) min/i;
@@ -27,7 +28,8 @@ const SHORT_RUNS = /(?:terminate|originate)[^.\n]*? at ([^.\n]+)/i;
 const NO_LOOP = /not via the city loop|no city loop|direct to and from flinders street/i;
 
 const text = (t: GtfsRealtimeBindings.transit_realtime.ITranslatedString | null | undefined) =>
-  t?.translation?.find((x) => !x.language || x.language === "en")?.text?.trim() ?? "";
+  // English, which Translink tags "en-AU".
+  t?.translation?.find((x) => !x.language || /^en\b/i.test(x.language))?.text?.trim() ?? "";
 
 type Stretch = NonNullable<AlertDto["stretch"]>;
 
@@ -81,6 +83,9 @@ function between(s: string, phrase: RegExp, line: LineConfig): Stretch | null {
  */
 export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData, now: number): AlertsResponse {
   const own = line.routeIdMatch.map((m) => m.replace(/:$/, ""));
+  const ownPattern = line.alertRoutePattern ? new RegExp(line.alertRoutePattern) : null;
+  const isOwn = (routeId: string | null | undefined) =>
+    !!routeId && (ownPattern ? ownPattern.test(routeId) : own.some((m) => routeId.includes(m)));
   const stationOf = new Map<string, string>();
   for (const s of line.stations) data.stations[s.id]?.stopIds.forEach((stop) => stationOf.set(stop, s.id));
 
@@ -88,7 +93,7 @@ export function buildAlerts(feed: FeedMessage, line: LineConfig, data: LineData,
   for (const entity of feed.entity) {
     const a = entity.alert;
     const entities = a?.informedEntity ?? [];
-    if (!a || !entities.some((e) => own.some((m) => e.routeId?.includes(m)))) continue;
+    if (!a || !entities.some((e) => isOwn(e.routeId))) continue;
     const effect = Alert.Effect[a.effect ?? Alert.Effect.UNKNOWN_EFFECT] ?? "UNKNOWN_EFFECT";
     if (NOTICE_EFFECTS.has(effect)) continue;
 

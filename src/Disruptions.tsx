@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AlertDto } from "../shared/types";
+import { dateFormat } from "../shared/time";
 import { calendarWeeks, disruptedDays } from "./calendar";
 import { useNetwork, type Network, type Switch } from "./networks";
 
@@ -11,13 +12,12 @@ interface Props {
 
 const COLLAPSED_KEY = "disruptionsCollapsed";
 
-const clock = new Intl.DateTimeFormat("en-AU", {
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-  timeZone: "Australia/Melbourne",
-});
-const time = (unix: number) => clock.format(unix * 1000).replace(/\s/g, "").replace(":00", "").toLowerCase();
+const time = (unix: number, timeZone: string) =>
+  dateFormat("en-AU", timeZone, { hour: "numeric", minute: "2-digit", hour12: true })
+    .format(unix * 1000)
+    .replace(/\s/g, "")
+    .replace(":00", "")
+    .toLowerCase();
 const monthName = (date: string) =>
   new Date(`${date}T00:00:00Z`).toLocaleString("en-AU", { month: "long", timeZone: "UTC" });
 /** Filled crescent, drawn rather than a ☾ character so it's solid in every font. */
@@ -46,7 +46,7 @@ function headline(alert: AlertDto, name: (id: string) => string) {
 }
 
 function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
-  const days = disruptedDays(alert.periods, now);
+  const days = disruptedDays(alert.periods, now, useNetwork().timeZone);
   const weeks = calendarWeeks(days.keys());
   if (!weeks.length) return null;
   const months = [...new Set(weeks.flat().filter((d) => days.has(d)).map(monthName))];
@@ -77,11 +77,11 @@ function Calendar({ alert, now }: { alert: AlertDto; now: number }) {
 function summary(alert: AlertDto, now: number, network: Network) {
   const name = (id: string) => network.stations[id]?.name ?? id;
   const { title, sub } = headline(alert, name);
-  const days = disruptedDays(alert.periods, now);
+  const days = disruptedDays(alert.periods, now, network.timeZone);
   const nightOnly = days.size > 0 && [...days.values()].every((k) => k === "night");
   // When the trains stop each night, from the same periods the calendar uses.
   const firstStart = Math.min(...alert.periods.map((p) => p.start ?? Infinity));
-  const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart)}` : null;
+  const after = nightOnly && Number.isFinite(firstStart) ? `after ${time(firstStart, network.timeZone)}` : null;
   return { title, sub, after, days };
 }
 
@@ -179,7 +179,7 @@ export function Disruptions({ alerts, now }: Props) {
     }
   };
   const notices = mergeAlike(alerts, now, network);
-  const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now).values()].includes("night"));
+  const hasNight = notices.some(({ alert }) => [...disruptedDays(alert.periods, now, network.timeZone).values()].includes("night"));
   return (
     <aside className={`disruptions${collapsed ? " collapsed" : ""}`} aria-label="Disruptions">
       <button className="disruptions-bar" onClick={toggle} aria-expanded={!collapsed} aria-label="Disruptions">

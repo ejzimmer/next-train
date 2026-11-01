@@ -136,6 +136,8 @@ export function createLayout(gtfsNames: Record<string, string> = {}) {
         textColour: groups[def.group].text,
         group: def.group,
         routeIdMatch: def.routeIdMatch,
+        ...(def.routeIdPattern && { routeIdPattern: def.routeIdPattern }),
+        ...(def.alertRoutePattern && { alertRoutePattern: def.alertRoutePattern }),
         cityLoop: def.cityLoop && [id(def.cityLoop[0]), id(def.cityLoop[1])],
         platformStations: stations.filter((s) => switches.get(s.id)!.size > 1).map((s) => s.id),
         stations,
@@ -155,6 +157,8 @@ export interface LineDef {
   switchId?: string;
   mode: LineConfig["mode"];
   routeIdMatch: string[];
+  routeIdPattern?: string;
+  alertRoutePattern?: string;
   group: string;
   /** Station names, in order; `prefix` is the namespace they were placed in. */
   stations: string[];

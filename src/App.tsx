@@ -152,10 +152,11 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
   const alerts = usePoll<NetworkAlertsResponse>(`/api/alerts?city=${city}`, ALERTS_POLL_MS);
   const now = useNow(10_000);
   const hasStations = Object.keys(network.places).length > 0;
-  const shownVehicles = useMemo(
-    () => (vehicles.data?.vehicles ?? []).filter((v) => onLine.has(v.line)),
-    [vehicles.data, onLine],
-  );
+  // A train can be listed on more than one line (running through from one to another): the first one shown.
+  const shownVehicles = useMemo(() => {
+    const seen = new Set<string>();
+    return (vehicles.data?.vehicles ?? []).filter((v) => onLine.has(v.line) && !seen.has(v.id) && !!seen.add(v.id));
+  }, [vehicles.data, onLine]);
   const shownDepartures = departures.data?.departures.filter((d) => onLine.has(d.line));
   // Each line's alerts, with its switch; Disruptions merges the ones that read the same.
   const shownAlerts = useMemo(() => {

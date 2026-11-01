@@ -2,7 +2,15 @@ import type { LineConfig } from "./types";
 
 /** Whether a GTFS route_id is the line's own (not its replacement buses). */
 export function isLineRoute(routeId: string | null | undefined, line: LineConfig): boolean {
-  return !!routeId && line.routeIdMatch.some((m) => routeId.includes(m));
+  return !!routeId && (line.routeIdMatch.some((m) => routeId.includes(m)) || routePattern(line)?.test(routeId) === true);
+}
+
+const patterns = new WeakMap<LineConfig, RegExp>();
+function routePattern(line: LineConfig) {
+  if (!line.routeIdPattern) return null;
+  let re = patterns.get(line);
+  if (!re) patterns.set(line, (re = new RegExp(line.routeIdPattern)));
+  return re;
 }
 
 /** The two stations at the ends of segment `i`: next to each other in `stations`, or one of the extra `track`s. */

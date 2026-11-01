@@ -1,8 +1,10 @@
-// Each line with its generated data (npm run gtfs:melbourne, gtfs:sydney). Used by the functions, not the page:
+// Each line with its generated data (npm run gtfs:melbourne, gtfs:sydney, gtfs:brisbane). Used by the functions, not the page:
 // the timetables are large.
 import stations from "../data/stations.json";
 import sydneyStations from "../data/sydney/stations.json";
 import sydneyTimetable from "../data/sydney/lines.json";
+import brisbaneStations from "../data/brisbane/stations.json";
+import brisbaneTimetable from "../data/brisbane/lines.json";
 import alameinTrips from "../data/alamein.trips.json";
 import alameinTimes from "../data/alamein.times.json";
 import belgraveTrips from "../data/belgrave.trips.json";
@@ -37,6 +39,7 @@ import williamstownTrips from "../data/williamstown.trips.json";
 import williamstownTimes from "../data/williamstown.times.json";
 import { LINES } from "./network";
 import { LINES as SYDNEY_LINES } from "./sydney";
+import { LINES as BRISBANE_LINES } from "./brisbane";
 import type { City, LineConfig, LineData, LineTimes } from "./types";
 
 const TIMETABLES: Record<string, [unknown, unknown]> = {
@@ -74,17 +77,27 @@ export const lines: Lines = Object.fromEntries(
   }),
 );
 
-const sydney: Lines = Object.fromEntries(
-  SYDNEY_LINES.map((config) => {
-    const timetable = (sydneyTimetable.lines as unknown as Record<string, { trips: LineData["trips"]; times: LineTimes }>)[config.id];
-    const data: LineData = {
-      generatedAt: sydneyTimetable.generatedAt,
-      stations: sydneyStations.stations as LineData["stations"],
-      trips: timetable?.trips ?? {},
-      times: timetable?.times,
-    };
-    return [config.id, { config, data }];
-  }),
-);
+/** A city whose timetable is one file for all its lines (data/<city>/lines.json). */
+function fromTimetable(
+  configs: LineConfig[],
+  stations: { stations: unknown },
+  timetable: { generatedAt: string; lines: unknown },
+): Lines {
+  return Object.fromEntries(
+    configs.map((config) => {
+      const line = (timetable.lines as Record<string, { trips: LineData["trips"]; times: LineTimes }>)[config.id];
+      const data: LineData = {
+        generatedAt: timetable.generatedAt,
+        stations: stations.stations as LineData["stations"],
+        trips: line?.trips ?? {},
+        times: line?.times,
+      };
+      return [config.id, { config, data }];
+    }),
+  );
+}
 
-export const cities: Record<City, Lines> = { melbourne: lines, sydney };
+const sydney = fromTimetable(SYDNEY_LINES, sydneyStations, sydneyTimetable);
+const brisbane = fromTimetable(BRISBANE_LINES, brisbaneStations, brisbaneTimetable);
+
+export const cities: Record<City, Lines> = { melbourne: lines, sydney, brisbane };

@@ -36,8 +36,13 @@ export function buildVehicles(feed: FeedMessage, line: LineConfig, data: LineDat
         ? directionFromBearing(v.position.bearing!, segmentBearing(segment, line, data))
         : null);
     const id = v.vehicle?.id || entity.id;
+    // Translink's vehicle ids aren't car numbers, and its feed doesn't say which trains they are.
     const { type, cars, carNumbers } =
-      line.city === "sydney" ? sydneyTrainType(entity, line) : { ...trainType(id), carNumbers: id.split("-") };
+      line.city === "sydney"
+        ? sydneyTrainType(entity, line)
+        : line.city === "brisbane"
+          ? { type: null, cars: 0, carNumbers: null }
+          : { ...trainType(id), carNumbers: id.split("-") };
     const timestamp = toNum(v.timestamp);
     // The same train can be reported against its old and next trip: keep the newer report, or
     // when both carry the same time, the later-starting trip, so the map doesn't flip between them.

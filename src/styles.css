@@ -176,6 +176,10 @@ footer { margin-top: 24px; }
 .wt-body { fill: #d5dade; stroke: #4d5866; stroke-width: 1; }
 .wt-door { fill: #bcc3ca; stroke: #6b7682; stroke-width: 0.6; }
 .wt-door-gap { stroke: #6b7682; stroke-width: 0.6; }
+.ngr-body { fill: #f7f8f9; stroke: #4d5866; stroke-width: 1; }
+.ngr-band { fill: #2b3138; }
+.ngr-door { fill: #e9ecef; stroke: #6b7682; stroke-width: 0.6; }
+.ngr-nose { fill: #2b3138; stroke: #4d5866; stroke-width: 1; }
 .xt-wheel circle { fill: #333; }
 .xt-wheel line { stroke: #bbb; stroke-width: 1.5; }
 .xt-wheel { animation: xt-spin 0.7s linear infinite; }

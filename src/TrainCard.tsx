@@ -29,7 +29,7 @@ function ago(secs: number) {
 
 /** Details of one train, with buttons to board it (circle it on the map) and share it. */
 export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard, onClose }: Props) {
-  const { city, lineById, stations } = useNetwork();
+  const { city, lineById, stations, timeZone } = useNetwork();
   const line = lineById[vehicle.line];
   const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const trip = usePoll<TripDto>(
@@ -85,7 +85,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
           disabled={!rest.length}
           onClick={() => setShowStops(!showStops)}
         >
-          <span className="pid-time">{formatTime(next.time)}</span>
+          <span className="pid-time">{formatTime(next.time, timeZone)}</span>
           <span className="pid-dest">{name(next.station)}</span>
           {next.platform && <span className="pid-detail">Plat {next.platform}</span>}
           {trip!.delay != null && <span className="pid-mins">{delayText(trip!.delay)}</span>}
@@ -94,7 +94,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
       {showStops &&
         rest.map((s) => (
           <div key={s.station + s.time} className="stop-row">
-            <span className="pid-time">{formatTime(s.time)}</span>
+            <span className="pid-time">{formatTime(s.time, timeZone)}</span>
             <span className="pid-dest">{name(s.station)}</span>
             {s.platform && <span className="pid-detail">Plat {s.platform}</span>}
           </div>
