@@ -45,7 +45,8 @@ const FEEDS: Record<City, Record<FeedKind, string[]>> = {
 
 /** The API key's environment variable and how it's sent; Translink's feeds don't need one. */
 const KEYS: Record<City, { env: string; header: (key: string) => Record<string, string> } | null> = {
-  melbourne: { env: "PTV_OPENDATA_KEY", header: (key) => ({ KeyID: key }) },
+  // PTV's API specs name Ocp-Apim-Subscription-Key; the metro feeds also take the older KeyID.
+  melbourne: { env: "PTV_OPENDATA_KEY", header: (key) => ({ KeyID: key, "Ocp-Apim-Subscription-Key": key }) },
   sydney: { env: "TFNSW_OPENDATA_KEY", header: (key) => ({ Authorization: `apikey ${key}` }) },
   brisbane: null,
 };
