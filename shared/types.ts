@@ -91,6 +91,8 @@ export interface VehicleDto {
   carNumbers: string[] | null;
   /** Placed by the timetable, not a live report (trams, while their live feed has nothing). */
   scheduled?: boolean;
+  /** Seconds late (negative: early), for a tram placed by its timetable and how late it's running. */
+  delay?: number;
 }
 
 export interface DepartureDto {

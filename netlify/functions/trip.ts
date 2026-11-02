@@ -12,6 +12,12 @@ const PLATFORM_STATIONS = Object.fromEntries(Object.entries(cities).map(([city, 
   Set<string>
 >;
 
+/** How late the page's tram is running (?delay=, seconds), from the Timetable API. */
+function delayParam(params: URLSearchParams) {
+  const d = Number(params.get("delay"));
+  return params.has("delay") && Number.isFinite(d) ? d : null;
+}
+
 /** One trip's remaining stops (?id=trip id&line=line id&city=). */
 export default async (req: Request) => {
   const params = new URL(req.url).searchParams;
@@ -28,7 +34,7 @@ export default async (req: Request) => {
     const now = Date.now() / 1000;
     const trip =
       buildTrip(feed, id, line.config, line.data, PLATFORM_STATIONS[city], now) ??
-      (line.config.mode === "tram" ? scheduledTrip(id, line.data, now) : null);
+      (line.config.mode === "tram" ? scheduledTrip(id, line.data, now, delayParam(params)) : null);
     if (!trip) return errorResponse(404, "Trip not running");
     return new Response(JSON.stringify(trip), { headers: CACHE_HEADERS });
   } catch (e) {
