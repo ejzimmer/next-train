@@ -180,6 +180,8 @@ export function LineMap({
 
   // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom.
   const [scale, setZoom] = useState(1);
+  // The tram stop being pointed at or focused: its name is the only tram stop name shown, over everything else.
+  const [pointed, setPointed] = useState<string | null>(null);
   const [width, height] = [box.width * scale, box.height * scale];
   // The scale on screen, and the one asked for, which runs ahead of it while several zoom events
   // arrive before the next render.
@@ -424,6 +426,11 @@ export function LineMap({
                 <feFlood className="label-bg" />
                 <feComposite in="SourceGraphic" operator="over" />
               </filter>
+              {/* The same, solid, behind a tram stop's name. */}
+              <filter id="label-solid" x="-0.06" y="-0.15" width="1.12" height="1.3">
+                <feFlood className="label-solid" />
+                <feComposite in="SourceGraphic" operator="over" />
+              </filter>
             </defs>
             {/* Trams first, so the trains are drawn over them. */}
             {[...lines.filter((l) => l.mode === "tram"), ...lines.filter((l) => l.mode !== "tram")].map((line) => {
@@ -470,6 +477,12 @@ export function LineMap({
                   aria-label={nearest.includes(s.id) ? `${s.name}, nearest to you` : s.name}
                   aria-pressed={selected === s.id}
                   style={{ ["--line" as string]: colour }}
+                  {...(s.tram && {
+                    onMouseEnter: () => setPointed(s.id),
+                    onMouseLeave: () => setPointed((p) => (p === s.id ? null : p)),
+                    onFocus: () => setPointed(s.id),
+                    onBlur: () => setPointed((p) => (p === s.id ? null : p)),
+                  })}
                 >
                   <line
                     className="station-hit"
@@ -501,12 +514,25 @@ export function LineMap({
                     strokeWidth={s.tram ? 3 : 9}
                     strokeLinecap="round"
                   />
-                  <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={s.tram ? "start" : LABEL[s.label].anchor}>
-                    {s.name}
-                  </text>
+                  {!s.tram && (
+                    <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
+                      {s.name}
+                    </text>
+                  )}
                 </g>
               );
             })}
+            {/* One tram stop's name: the one pointed at, else the chosen one. Drawn last, so nothing covers it. */}
+            {(() => {
+              const s = stations.find((x) => x.tram && x.id === (pointed ?? selected));
+              return (
+                s && (
+                  <text className="tram-label" x={s.labelAt[0]} y={s.labelAt[1]} filter="url(#label-solid)" aria-hidden>
+                    {s.name}
+                  </text>
+                )
+              );
+            })()}
             {vehicles.map((v) => {
               const age = now - v.timestamp;
               const p = trainPoint(v);
