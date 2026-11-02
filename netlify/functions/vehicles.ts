@@ -1,6 +1,7 @@
 import type { Config } from "@netlify/functions";
 import { cityFeed, feedSummary } from "../../shared/feed";
 import { cities, tramData, type Lines } from "../../shared/lines";
+import { liveTrams, ptvCredentials, type LiveTram } from "../../shared/ptvTimetable";
 import { scheduledTrams } from "../../shared/scheduledTrams";
 import { buildVehicles, startOf, type PlacedVehicle } from "../../shared/vehicles";
 import { CACHE_HEADERS, cityOf, errorResponse } from "../../shared/http";
@@ -15,7 +16,8 @@ export default async (req: Request) => {
   const city = cityOf(req);
   if (!city) return errorResponse(404, "Unknown city");
   try {
-    if (new URL(req.url).searchParams.has("debug")) {
+    const params = new URL(req.url).searchParams;
+    if (params.has("debug")) {
       const feed = await cityFeed(city, "vehicles");
       const placed = Object.values(cities[city]).map(({ config, data }) => [config.id, buildVehicles(feed, config, data).vehicles.length]);
       const body = {
@@ -23,6 +25,7 @@ export default async (req: Request) => {
         trips: await feedSummary(city, "trips"),
         alerts: (await feedSummary(city, "alerts")).map(({ feed, ...f }) => ({ feed, ...("error" in f ? f : { entities: f.entities }) })),
         placed: Object.fromEntries(placed),
+        timetableApi: await timetableApiSummary(city, params),
       };
       return new Response(JSON.stringify(body, null, 1), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
     }
@@ -30,17 +33,52 @@ export default async (req: Request) => {
     const lines = cities[city];
     const perLine = Object.values(lines).map(({ config, data }) => buildVehicles(feed, config, data));
     const vehicles = newestPerTrain(perLine.flatMap((r) => r.vehicles), lines);
-    // A tram route the live feed has nothing on gets its trams from the timetable.
+    // A tram route the live feed has nothing on gets its trams from the timetable, placed by how late each is
+    // running where the Timetable API says (for the routes the page shows, ?trams=96,86).
     const live = new Set(vehicles.map((v) => v.line));
     const now = Math.floor(Date.now() / 1000);
-    for (const { config, data } of Object.values(lines))
-      if (config.mode === "tram" && !live.has(config.id)) vehicles.push(...scheduledTrams(config, data, tramData, now));
+    const missing = Object.values(lines).filter(({ config }) => config.mode === "tram" && !live.has(config.id));
+    const delays = await tramDelays(missing, params, now);
+    for (const { config, data } of missing) vehicles.push(...scheduledTrams(config, data, tramData, now, delays.get(config.id)));
     const body: VehiclesResponse = { feedTimestamp: perLine[0]?.feedTimestamp ?? 0, vehicles };
     return new Response(JSON.stringify(body), { headers: CACHE_HEADERS });
   } catch (e) {
     return errorResponse(502, String(e));
   }
 };
+
+/** The tram routes the page shows (?trams=96,86), of those given. */
+const shownTrams = (lines: Lines[string][], params: URLSearchParams) => {
+  const shown = new Set((params.get("trams") ?? "").split(",").map((n) => `tram-${n.trim()}`));
+  return lines.filter(({ config }) => shown.has(config.id));
+};
+
+async function tramDelays(lines: Lines[string][], params: URLSearchParams, now: number): Promise<Map<string, Map<string, LiveTram>>> {
+  const creds = ptvCredentials();
+  const shown = shownTrams(lines, params);
+  if (!creds || !shown.length) return new Map();
+  try {
+    return await liveTrams(shown, tramData, now, creds);
+  } catch (e) {
+    console.error("Timetable API:", e);
+    return new Map();
+  }
+}
+
+/** For ?debug: whether the Timetable API is set up and how many trams it times on each route asked about. */
+async function timetableApiSummary(city: string, params: URLSearchParams) {
+  if (city !== "melbourne") return null;
+  const creds = ptvCredentials();
+  if (!creds) return { error: "PTV_DEVID and PTV_API_KEY not set" };
+  const shown = shownTrams(Object.values(cities.melbourne), params);
+  if (!shown.length) return { configured: true, note: "add &trams=96,86 to check routes" };
+  try {
+    const live = await liveTrams(shown, tramData, Math.floor(Date.now() / 1000), creds);
+    return Object.fromEntries(shown.map(({ config }) => [config.id, live.get(config.id)?.size ?? "no answer"]));
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
 
 /**
  * One report per train. The same trip can also be placed on several lines (a Sydney line's branches share

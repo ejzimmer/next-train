@@ -145,7 +145,9 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
   const onMap = useMemo(() => new Set(lines.flatMap((l) => l.stations.map((s) => s.id))), [lines]);
   const station = selected && onMap.has(selected) ? selected : null;
 
-  const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?city=${city}`, POLL_MS);
+  // The tram routes showing, so the server asks the Timetable API only about those.
+  const tramRoutes = lines.filter((l) => l.mode === "tram").map((l) => l.id.replace(/^tram-/, "")).join(",");
+  const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?city=${city}${tramRoutes ? `&trams=${tramRoutes}` : ""}`, POLL_MS);
 
   // A shared train: once the trains are in, show just its line with it boarded, or say its trip has finished.
   const [linkedTrip] = useState(trainFromUrl);
@@ -281,7 +283,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
         <p className="muted">
           {vehicles.error ? "Live data unavailable, retrying" : stale}
         </p>
-        {!vehicles.error && shownVehicles.some((v) => v.scheduled) && <p className="muted">Live tram data unavailable</p>}
+        {!vehicles.error && shownVehicles.some((v) => v.scheduled) && !shownVehicles.some((v) => network.lineById[v.line]?.mode === "tram" && !v.scheduled) && <p className="muted">Live tram data unavailable</p>}
         <p className="muted" aria-live="polite">
           {nearestText(nearest)}
         </p>

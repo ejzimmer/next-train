@@ -34,7 +34,7 @@ export function TrainCard({ vehicle, destination, now, pollMs, boarded, onBoard,
   const tram = line?.mode === "tram";
   const name = (id: string | null) => stations[id ?? ""]?.name ?? id ?? "";
   const trip = usePoll<TripDto>(
-    `/api/trip?id=${encodeURIComponent(vehicle.tripId)}&line=${encodeURIComponent(vehicle.line)}&city=${city}`,
+    `/api/trip?id=${encodeURIComponent(vehicle.tripId)}&line=${encodeURIComponent(vehicle.line)}&city=${city}${vehicle.delay != null ? `&delay=${vehicle.delay}` : ""}`,
     pollMs,
   ).data;
   const dest = trip?.destination ?? destination;
