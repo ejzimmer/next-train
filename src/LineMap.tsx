@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { BusDto } from "../shared/buses";
 import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
+import { BUS_PLACES, busBetween, type ShownBus } from "./buses";
 import { useNetwork } from "./networks";
 import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
 import { useStopped } from "./useStopped";
@@ -56,6 +58,9 @@ interface Props {
   reveal: string | null;
   /** Shown beside the selected station's name, or the selected train. */
   board: ReactNode;
+  /** Buses linking the lines showing, drawn only between those links, and where they are. */
+  buses?: ShownBus[];
+  busVehicles?: BusDto[];
 }
 
 const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor: "start" | "middle" | "end" }> = {
@@ -110,6 +115,8 @@ export function LineMap({
   boarded,
   reveal,
   board,
+  buses = [],
+  busVehicles = [],
 }: Props) {
   const network = useNetwork();
   const { lines: LINES, stations: STATIONS, homeLine } = network;
@@ -158,6 +165,22 @@ export function LineMap({
     return [...byId.values()];
   }, [lines, geometry]);
 
+  // Where each bus links: the middle of the station or tram stop, or the airport.
+  const placeAt = useMemo(() => {
+    const at = new Map<string, Pt>();
+    for (const s of stations) {
+      const xs = s.points.map((p) => p[0]);
+      const ys = s.points.map((p) => p[1]);
+      at.set(s.id, [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]);
+    }
+    for (const [id, p] of Object.entries(BUS_PLACES)) at.set(id, [p.x, p.y]);
+    return at;
+  }, [stations]);
+  const busPlaces = useMemo(
+    () => Object.keys(BUS_PLACES).filter((id) => buses.some((b) => b.dirs.some((d) => d.links.some((l) => l.place === id)))),
+    [buses],
+  );
+
   // The drawing is cropped to the lines switched on, labels included.
   const box = useMemo(() => {
     let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -174,9 +197,14 @@ export function LineMap({
       add(left, y - 13);
       add(left + w, y + 4);
     }
+    for (const id of busPlaces) {
+      const [x, y] = placeAt.get(id)!;
+      add(x + 4, y + 4);
+      add(x - 14 - BUS_PLACES[id].name.length * CHAR, y - 13);
+    }
     if (!stations.length) return { x: 0, y: 0, width: 0, height: 0 };
     return { x: x0 - MARGIN, y: y0 - MARGIN, width: x1 - x0 + 2 * MARGIN, height: y1 - y0 + 2 * MARGIN };
-  }, [stations]);
+  }, [stations, busPlaces, placeAt]);
 
   // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom.
   const [scale, setZoom] = useState(1);
@@ -432,6 +460,27 @@ export function LineMap({
                 <feComposite in="SourceGraphic" operator="over" />
               </filter>
             </defs>
+            {/* Buses first, thin, under everything else: each through just the links it makes. */}
+            {buses.map((bus) => {
+              const longest = bus.dirs.reduce((a, b) => (b.links.length > a.links.length ? b : a));
+              const pts = longest.links.map((l) => placeAt.get(l.place)).filter((p): p is Pt => !!p);
+              return (
+                <path key={bus.id} className="bus-route" d={pathOf(pts)} stroke={bus.colour} aria-hidden>
+                  <title>{bus.skybus ? bus.name : `${bus.label} ${bus.name}`}</title>
+                </path>
+              );
+            })}
+            {busPlaces.map((id) => {
+              const [x, y] = placeAt.get(id)!;
+              return (
+                <g key={id} className="bus-place" aria-hidden>
+                  <circle cx={x} cy={y} r={5} />
+                  <text x={x - 10} y={y + 4} textAnchor="end">
+                    {BUS_PLACES[id].name}
+                  </text>
+                </g>
+              );
+            })}
             {/* Trams first, so the trains are drawn over them. */}
             {[...lines.filter((l) => l.mode === "tram"), ...lines.filter((l) => l.mode !== "tram")].map((line) => {
               const geo = geometry.get(line.id)!;
@@ -533,6 +582,25 @@ export function LineMap({
                 )
               );
             })()}
+            {busVehicles.map((b) => {
+              const route = buses.find((r) => r.id === b.route);
+              const at = route && busBetween(b, route);
+              const [p, q] = at ? [placeAt.get(at.from), placeAt.get(at.to)] : [];
+              if (!route || !at || !p || !q) return null;
+              const dest = route.dirs.find((d) => d.dir === b.dir)?.dest;
+              return (
+                <circle
+                  key={b.id}
+                  className={`bus${b.scheduled || now - b.timestamp > STALE_AFTER ? " stale" : ""}`}
+                  cx={p[0] + (q[0] - p[0]) * at.f}
+                  cy={p[1] + (q[1] - p[1]) * at.f}
+                  r={3.5}
+                  style={{ ["--line" as string]: route.colour }}
+                >
+                  <title>{`${route.label}${dest ? ` to ${dest}` : ""}${b.scheduled ? " (timetabled)" : ""}`}</title>
+                </circle>
+              );
+            })}
             {vehicles.map((v) => {
               const age = now - v.timestamp;
               const p = trainPoint(v);
