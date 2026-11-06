@@ -259,3 +259,13 @@ footer { margin-top: 24px; }
 .next-stop:disabled { cursor: default; }
 .stop-row { display: flex; align-items: center; gap: 12px; padding: 3px 0 3px 14px; font-size: 0.9rem; }
 .stop-row .pid-dest { font-weight: 600; }
+
+/* Buses: thin lines between the stations and tram stops they link, and a dot per bus. */
+.bus-route { fill: none; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; opacity: 0.6; }
+.bus-place circle { fill: var(--bg); stroke: var(--fg); stroke-width: 2; }
+.bus-place text { font-size: 13px; fill: var(--fg); }
+.bus { fill: var(--line); stroke: var(--bg); stroke-width: 1.5; }
+.bus.stale { fill: #c9c9c9; stroke: #7a8a99; }
+.mode-row { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.mode-row .mode-switch { margin: 0; }
+.buses-switch { --line: #ff8200; --line-text: #fff; }
