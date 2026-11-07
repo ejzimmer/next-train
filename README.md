@@ -24,6 +24,8 @@ Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
    the Transport for NSW Open Data Hub.
 2. In Netlify, set the environment variables `PTV_OPENDATA_KEY` and `TFNSW_OPENDATA_KEY` to those keys. Use the
    Functions scope; they don't need to be available to the build.
+   The same `PTV_OPENDATA_KEY` gives live buses (the Buses switch). Their routes come from
+   `npm run gtfs:buses`, rebuilt weekly with the trams.
    Optionally, for live tram times while the open-data tram feed is down, also set `PTV_DEVID` and `PTV_API_KEY`
    to a PTV Timetable API developer ID and key (email APIKeyRequest@ptv.vic.gov.au). Without them, trams are
    placed by the timetable. Check with `/api/vehicles?debug=1&trams=96`.

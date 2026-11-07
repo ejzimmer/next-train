@@ -1,3 +1,4 @@
+import type { BusDto } from "./buses";
 export type Direction = "citybound" | "outbound";
 
 export type City = "melbourne" | "sydney" | "brisbane";
@@ -124,6 +125,8 @@ export interface TripDto {
 export interface VehiclesResponse {
   feedTimestamp: number;
   vehicles: VehicleDto[];
+  /** Melbourne's buses on the routes asked for (?buses=). */
+  buses?: BusDto[];
 }
 
 export interface DeparturesResponse {

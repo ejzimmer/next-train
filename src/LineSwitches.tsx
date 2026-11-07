@@ -7,6 +7,9 @@ interface Props {
   /** Which buttons show, where a city has trams as well as trains. */
   mode: "train" | "tram";
   onMode: (mode: "train" | "tram") => void;
+  /** Whether buses linking the lines showing are drawn (Melbourne). */
+  buses?: boolean;
+  onBuses?: (on: boolean) => void;
 }
 
 const GAP = 6;
@@ -28,7 +31,7 @@ function rowsAt(widths: number[], width: number) {
  * A button per line, filled in the line's colour while it's on the map. When they wrap, the row is
  * narrowed as far as it goes without adding a row, so the rows come out about the same length.
  */
-export function LineSwitches({ on, onToggle, mode, onMode }: Props) {
+export function LineSwitches({ on, onToggle, mode, onMode, buses, onBuses }: Props) {
   const network = useNetwork();
   const hasTrams = network.switches.some((s) => s.mode === "tram");
   const switches = network.switches.filter((s) => (s.mode ?? "train") === (hasTrams ? mode : "train"));
@@ -60,12 +63,19 @@ export function LineSwitches({ on, onToggle, mode, onMode }: Props) {
   return (
     <div ref={outer}>
       {hasTrams && (
-        <div className="mode-switch" role="tablist" aria-label="Show buttons for">
-          {(["train", "tram"] as const).map((m) => (
-            <button key={m} className="mode-tab" role="tab" aria-selected={mode === m} onClick={() => onMode(m)}>
-              {m === "train" ? "Trains" : "Trams"}
+        <div className="mode-row">
+          <div className="mode-switch" role="tablist" aria-label="Show buttons for">
+            {(["train", "tram"] as const).map((m) => (
+              <button key={m} className="mode-tab" role="tab" aria-selected={mode === m} onClick={() => onMode(m)}>
+                {m === "train" ? "Trains" : "Trams"}
+              </button>
+            ))}
+          </div>
+          {onBuses && (
+            <button className="line-switch buses-switch" aria-pressed={!!buses} onClick={() => onBuses(!buses)}>
+              Buses
             </button>
-          ))}
+          )}
         </div>
       )}
       <div className={`line-switches${hasTrams && mode === "tram" ? " trams" : ""}`} ref={inner} style={{ maxWidth }}>

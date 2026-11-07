@@ -100,6 +100,13 @@ export async function cityFeed(city: City, kind: FeedKind): Promise<FeedMessage>
   });
 }
 
+/** Melbourne's live bus positions (kept apart from the trains' and trams', and asked for only when buses show). */
+export function melbourneBusFeed(): Promise<FeedMessage> {
+  const key = process.env[KEYS.melbourne!.env];
+  if (!key) throw new Error(`${KEYS.melbourne!.env} is not set`);
+  return fetchFeed(`${PTV_REALTIME}/bus/vehicle-positions`, KEYS.melbourne!.header(key));
+}
+
 /**
  * What each of a city's feeds of one kind sent, for checking a new feed works (/api/vehicles?debug=1): whether it
  * arrived, how many entities, and a few of them in brief. Nothing secret.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { City, NetworkAlertsResponse, StationDeparturesResponse, VehiclesResponse } from "../shared/types";
 import { Disruptions } from "./Disruptions";
 import { HIDE_AFTER, LineMap } from "./LineMap";
+import { connectingBuses } from "./buses";
 import { LineSwitches } from "./LineSwitches";
 import { Loading } from "./Loading";
 import { CITIES, NETWORKS, NetworkContext, type Network } from "./networks";
@@ -34,6 +35,15 @@ function savedMode(): Mode {
     return localStorage.getItem(MODE_KEY) === "tram" ? "tram" : "train";
   } catch {
     return "train";
+  }
+}
+/** Whether buses linking the lines showing are drawn (Melbourne). */
+const BUSES_KEY = "showBuses";
+function savedBuses(): boolean {
+  try {
+    return localStorage.getItem(BUSES_KEY) === "1";
+  } catch {
+    return false;
   }
 }
 const CITY_KEY = "city";
@@ -141,13 +151,27 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
       // Not remembered; fine.
     }
   };
+  const [showBuses, setShowBuses] = useState(savedBuses);
+  const chooseBuses = (on: boolean) => {
+    setShowBuses(on);
+    try {
+      localStorage.setItem(BUSES_KEY, on ? "1" : "0");
+    } catch {
+      // Not remembered; fine.
+    }
+  };
+  const buses = useMemo(() => (city === "melbourne" && showBuses ? connectingBuses(lines) : []), [city, showBuses, lines]);
   const onLine = useMemo(() => new Set(lines.map((l) => l.id)), [lines]);
   const onMap = useMemo(() => new Set(lines.flatMap((l) => l.stations.map((s) => s.id))), [lines]);
   const station = selected && onMap.has(selected) ? selected : null;
 
   // The tram routes showing, so the server asks the Timetable API only about those.
   const tramRoutes = lines.filter((l) => l.mode === "tram").map((l) => l.id.replace(/^tram-/, "")).join(",");
-  const vehicles = usePoll<VehiclesResponse>(`/api/vehicles?city=${city}${tramRoutes ? `&trams=${tramRoutes}` : ""}`, POLL_MS);
+  const busRoutes = buses.map((b) => b.id).join(",");
+  const vehicles = usePoll<VehiclesResponse>(
+    `/api/vehicles?city=${city}${tramRoutes ? `&trams=${tramRoutes}` : ""}${busRoutes ? `&buses=${busRoutes}` : ""}`,
+    POLL_MS,
+  );
 
   // A shared train: once the trains are in, show just its line with it boarded, or say its trip has finished.
   const [linkedTrip] = useState(trainFromUrl);
@@ -287,7 +311,13 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
         <p className="muted" aria-live="polite">
           {nearestText(nearest)}
         </p>
-        <LineSwitches on={lineIds} onToggle={toggleLine} mode={mode} onMode={chooseMode} />
+        <LineSwitches
+          on={lineIds}
+          onToggle={toggleLine}
+          mode={mode}
+          onMode={chooseMode}
+          {...(city === "melbourne" && { buses: showBuses, onBuses: chooseBuses })}
+        />
       </header>
       <Disruptions alerts={shownAlerts} now={now} />
       {!hasStations && <p className="warning">Station data hasn't been generated yet (npm run gtfs:{city}).</p>}
@@ -296,6 +326,8 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
           <Loading />
         ) : (
           <LineMap
+            buses={buses}
+            busVehicles={vehicles.data?.buses}
             lines={lines}
             vehicles={shownVehicles}
             departures={shownDepartures}

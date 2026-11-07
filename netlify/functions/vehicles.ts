@@ -1,5 +1,8 @@
 import type { Config } from "@netlify/functions";
-import { cityFeed, feedSummary } from "../../shared/feed";
+import busRoutes from "../../data/buses/routes.json";
+import type { BusDto, BusRoutesData } from "../../shared/buses";
+import { liveBuses } from "../../shared/busVehicles";
+import { cityFeed, feedSummary, melbourneBusFeed } from "../../shared/feed";
 import { cities, tramData, type Lines } from "../../shared/lines";
 import { liveTrams, ptvCredentials, type LiveTram } from "../../shared/ptvTimetable";
 import { scheduledTrams } from "../../shared/scheduledTrams";
@@ -40,12 +43,27 @@ export default async (req: Request) => {
     const missing = Object.values(lines).filter(({ config }) => config.mode === "tram" && !live.has(config.id));
     const delays = await tramDelays(missing, params, now);
     for (const { config, data } of missing) vehicles.push(...scheduledTrams(config, data, tramData, now, delays.get(config.id)));
-    const body: VehiclesResponse = { feedTimestamp: perLine[0]?.feedTimestamp ?? 0, vehicles };
+    const buses = city === "melbourne" ? await busesOn(params) : undefined;
+    const body: VehiclesResponse = { feedTimestamp: perLine[0]?.feedTimestamp ?? 0, vehicles, ...(buses && { buses }) };
     return new Response(JSON.stringify(body), { headers: CACHE_HEADERS });
   } catch (e) {
     return errorResponse(502, String(e));
   }
 };
+
+const BUS_ROUTES = busRoutes as unknown as BusRoutesData;
+
+/** The buses on the routes the page draws (?buses=903,200); trains and trams still come if the bus feed fails. */
+async function busesOn(params: URLSearchParams): Promise<BusDto[] | undefined> {
+  const wanted = new Set((params.get("buses") ?? "").split(",").map((r) => r.trim()).filter(Boolean));
+  if (!wanted.size) return undefined;
+  try {
+    return liveBuses(await melbourneBusFeed(), BUS_ROUTES.routes, wanted);
+  } catch (e) {
+    console.error("Bus feed:", e);
+    return [];
+  }
+}
 
 /** The tram routes the page shows (?trams=96,86), of those given. */
 const shownTrams = (lines: Lines[string][], params: URLSearchParams) => {
