@@ -8,15 +8,10 @@ import type { LineConfig } from "../shared/types";
 
 const data = network as unknown as BusNetworkData;
 
-export const BUS_PLACES = data.places;
-
 export interface ShownBus {
   id: string;
-  /** The number on it ("903"), or "SkyBus". */
-  label: string;
   name: string;
   colour: string;
-  skybus: boolean;
   /** Each direction's links on the lines showing, in order along the route. */
   dirs: { dir: number; dest: string; links: BusLink[] }[];
 }
@@ -26,24 +21,21 @@ export function connectingBuses(lines: LineConfig[]): ShownBus[] {
   const linesAt = new Map<string, Set<string>>();
   for (const line of lines)
     for (const s of line.stations) linesAt.set(s.id, (linesAt.get(s.id) ?? new Set()).add(line.switchId));
-  for (const id of Object.keys(data.places)) linesAt.set(id, new Set([id]));
   const out: ShownBus[] = [];
   for (const r of data.routes) {
     const dirs = r.dirs
-      .map((d) => ({ dir: d.dir, dest: d.dest, links: d.links.filter((l) => linesAt.has(l.place) && (l.place in data.places ? !!r.skybus : true)) }))
+      .map((d) => ({ dir: d.dir, dest: d.dest, links: d.links.filter((l) => linesAt.has(l.place)) }))
       .filter((d) => d.links.length >= 2);
     if (!dirs.length) continue;
     const places = new Set(dirs.flatMap((d) => d.links.map((l) => l.place)));
-    // Not when one line has every place it links (a bus alongside that line), or it only meets the airport.
+    // Not when one line has every place it links: a bus alongside that line.
     const sets = [...places].map((p) => linesAt.get(p)!);
     const oneLine = [...sets[0]].some((line) => sets.every((s) => s.has(line)));
     if (oneLine || places.size < 2) continue;
     out.push({
       id: r.id,
-      label: r.skybus ? "SkyBus" : r.id,
       name: r.name,
       colour: r.colour,
-      skybus: !!r.skybus,
       dirs,
     });
   }

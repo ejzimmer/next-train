@@ -1,11 +1,6 @@
-/**
- * Placing buses on their routes: live ones by where they are (projected onto the route's stops), SkyBus by
- * its timetable, since the live feed doesn't have it.
- */
+/** Placing live buses on their routes, by where they are (projected onto the route's stops). */
 import type { BusDto, BusRoutesData } from "./buses";
 import { toNum, type FeedMessage } from "./feed";
-import { serviceMidnight } from "./schedule";
-import { dateFormat, TIME_ZONES } from "./time";
 
 type Pt = [number, number, number];
 
@@ -73,36 +68,3 @@ export function liveBuses(feed: FeedMessage, routes: BusRoutesData["routes"], wa
 
 const score = (p: { off: number; heading: number }, bearing: number | null) =>
   p.off + (bearing == null ? 0 : turn(p.heading, bearing) > 90 ? 1000 : 0);
-
-const localDate = dateFormat("en-CA", TIME_ZONES.melbourne, { year: "numeric", month: "2-digit", day: "2-digit" });
-const serviceDate = (unix: number) => localDate.format(unix * 1000).replace(/-/g, "");
-
-/** SkyBus coaches where the timetable has them now (today's trips and last night's still running). */
-export function skybusNow(data: BusRoutesData, wanted: Set<string>, now: number): BusDto[] {
-  const services = data.services.map((d) => new Set(d));
-  const days = [serviceDate(now - 86_400), serviceDate(now)].map((date) => ({ date, midnight: serviceMidnight(date)! }));
-  const out: BusDto[] = [];
-  for (const [key, { times, trips }] of Object.entries(data.skybus)) {
-    const [route, dir] = key.split("|");
-    if (!wanted.has(route) || times.length < 2) continue;
-    const end = times[times.length - 1][1];
-    trips.forEach(([start, service], n) => {
-      for (const { date, midnight } of days) {
-        const t = now - (midnight + start);
-        if (t < 0 || t > end || !services[service]?.has(date)) continue;
-        const k = times.findIndex((x, i) => i < times.length - 1 && x[1] <= t && t <= times[i + 1][1]);
-        if (k < 0) continue;
-        const [[d0, t0], [d1, t1]] = [times[k], times[k + 1]];
-        out.push({
-          id: `skybus:${key}:${n}:${date}`,
-          route,
-          dir: Number(dir),
-          d: Math.round(d0 + (t1 > t0 ? ((t - t0) / (t1 - t0)) * (d1 - d0) : 0)),
-          timestamp: now,
-          scheduled: true,
-        });
-      }
-    });
-  }
-  return out;
-}

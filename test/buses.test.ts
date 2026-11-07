@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import routes from "../data/buses/routes.json";
 import type { BusRoutesData } from "../shared/buses";
-import { project, skybusNow } from "../shared/busVehicles";
+import { project } from "../shared/busVehicles";
 import { cities } from "../shared/lines";
 import { busBetween, connectingBuses } from "../src/buses";
 
@@ -12,20 +12,13 @@ describe("connecting buses", () => {
   it("shows buses linking two lines, through just their links on those lines", () => {
     const buses = connectingBuses([line("hurstbridge"), line("mernda")]);
     expect(buses.length).toBeGreaterThan(0);
-    const places = new Set([...line("hurstbridge").stations, ...line("mernda").stations].map((s) => s.id).concat("airport"));
+    const places = new Set([...line("hurstbridge").stations, ...line("mernda").stations].map((s) => s.id));
     for (const b of buses) for (const d of b.dirs) for (const l of d.links) expect(places.has(l.place)).toBe(true);
   });
 
   it("leaves out buses that only run alongside one line", () => {
     const one = connectingBuses([line("hurstbridge")]);
-    const stations = new Set(line("hurstbridge").stations.map((s) => s.id));
-    expect(one.every((b) => b.skybus || b.dirs.some((d) => d.links.some((l) => !stations.has(l.place))))).toBe(true);
-    expect(one.filter((b) => !b.skybus)).toEqual([]);
-  });
-
-  it("takes SkyBus to the airport", () => {
-    const sky = connectingBuses([line("werribee")]).find((b) => b.id === "skybus-sky");
-    expect(sky?.dirs[0].links.map((l) => l.place)).toEqual(["airport", "southern-cross"]);
+    expect(one).toEqual([]);
   });
 
   it("puts a bus between the links it's travelling between", () => {
@@ -45,10 +38,4 @@ describe("placing buses", () => {
     expect(p.d).toBeCloseTo(d, 0);
   });
 
-  it("runs SkyBus by its timetable", () => {
-    const now = Date.parse("2026-11-12T22:00:00Z") / 1000;
-    const sky = skybusNow(data, new Set(["skybus-sky"]), now);
-    expect(sky.length).toBeGreaterThan(2);
-    expect(sky.every((b) => b.scheduled && b.route === "skybus-sky")).toBe(true);
-  });
 });

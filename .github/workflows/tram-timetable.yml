@@ -1,5 +1,5 @@
-# PTV's tram timetable gets new trip ids when it changes, so Melbourne's tram data (and its bus data, for
-# SkyBus's timetable and changed routes) is rebuilt every week and committed, which redeploys the site. The
+# PTV's tram timetable gets new trip ids when it changes, so Melbourne's tram data (and its bus routes, which
+# change too) is rebuilt every week and committed, which redeploys the site. The
 # GTFS download needs no key.
 name: Tram and bus timetable
 
