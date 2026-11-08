@@ -1,6 +1,6 @@
 import GtfsRealtimeBindings from "gtfs-realtime-bindings";
 import { toNum, type FeedMessage } from "./feed";
-import { isLineRoute } from "./routes";
+import { isLineTrip } from "./routes";
 import { resolveUpdates } from "./schedule";
 import { TIME_ZONES } from "./time";
 import type { DepartureDto, DeparturesResponse, Direction, LineConfig, LineData, LineTimes } from "./types";
@@ -51,7 +51,7 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
   for (const entity of feed.entity) {
     const tu = entity.tripUpdate;
     const tripId = tu?.trip?.tripId;
-    if (!tu || !tripId || !isLineRoute(tu.trip?.routeId, line)) continue;
+    if (!tu || !tripId || !isLineTrip(tu.trip, line, data)) continue;
     const cancelled = tu.trip.scheduleRelationship === TripDescriptor.ScheduleRelationship.CANCELED;
 
     const resolved = resolveUpdates(tu.stopTimeUpdate ?? [], data, tripId, tu.trip?.startDate, now, TIME_ZONES[line.city]);
@@ -64,8 +64,9 @@ export function buildDepartures(feed: FeedMessage, line: LineConfig, data: LineD
       (stops.length >= 2 ? (stops[stops.length - 1].index > stops[0].index ? "outbound" : "citybound") : null);
     const destination = known?.dest ?? (stops.length >= 2 ? line.stations[stops[stops.length - 1].index].id : null);
 
-    // Sydney destinations can be a headsign ("Penrith via Parramatta"): then the trip ends at its last stop.
-    const ends = line.city === "sydney" && !line.stations.some((s) => s.id === destination) ? stops[stops.length - 1]?.u : null;
+    // Sydney destinations and Melbourne trams' can be a headsign ("Penrith via Parramatta"): then the trip ends at its last stop.
+    const headsign = (line.city === "sydney" || line.mode === "tram") && !line.stations.some((s) => s.id === destination);
+    const ends = headsign ? stops[stops.length - 1]?.u : null;
     for (const { u, index } of stops) {
       if (u.scheduleRelationship === TripUpdate.StopTimeUpdate.ScheduleRelationship.SKIPPED) continue;
       const station = line.stations[index];

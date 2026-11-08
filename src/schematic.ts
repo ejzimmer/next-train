@@ -5,6 +5,8 @@ export type Pt = [number, number];
 
 /** Distance between the centres of lines drawn side by side. */
 export const SPACING = 10;
+/** Tram routes are drawn thinner, and closer together. */
+export const TRAM_SPACING = 4;
 
 export interface LineGeometry {
   /** The drawn points of each segment (see segmentEnds), shifted sideways where lines run side by side. */
@@ -84,7 +86,7 @@ export function networkGeometry(
     const present = groupsOn.get(key)!;
     const groups = (order.edgeOrder[key] ?? order.groupOrder).filter((g) => present.has(g));
     const k = groups.indexOf(line.group);
-    const d = (k - (groups.length - 1) / 2) * SPACING;
+    const d = (k - (groups.length - 1) / 2) * (line.mode === "tram" ? TRAM_SPACING : SPACING);
     return forward.get(key) === a ? d : -d;
   };
 

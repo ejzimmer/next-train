@@ -1,6 +1,6 @@
 # next-train: live train map
 
-A schematic map of Melbourne's Metro train lines, of Sydney Trains and Sydney light rail, and of Brisbane's trains, showing where each
+A schematic map of Melbourne's Metro train lines and trams, of Sydney Trains and Sydney light rail, and of Brisbane's trains, showing where each
 train is right now, with next departures for any station you click. Each city has its own tab. Each line can be
 switched on and off; lines sharing track are drawn side by side, as on the network maps. Data comes from Transport
 Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
@@ -24,6 +24,11 @@ Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
    the Transport for NSW Open Data Hub.
 2. In Netlify, set the environment variables `PTV_OPENDATA_KEY` and `TFNSW_OPENDATA_KEY` to those keys. Use the
    Functions scope; they don't need to be available to the build.
+   The same `PTV_OPENDATA_KEY` gives live buses (the Buses switch). Their routes come from
+   `npm run gtfs:buses`, rebuilt weekly with the trams.
+   Optionally, for live tram times while the open-data tram feed is down, also set `PTV_DEVID` and `PTV_API_KEY`
+   to a PTV Timetable API developer ID and key (email APIKeyRequest@ptv.vic.gov.au). Without them, trams are
+   placed by the timetable. Check with `/api/vehicles?debug=1&trams=96`.
 3. Generate Melbourne's station data: `npm run gtfs:melbourne` (downloads the GTFS Schedule zip), or
    `npm run gtfs:melbourne -- path/to/gtfs.zip`. Commit the files it writes in `data/`. Re-run when the timetable changes.
 4. Add `TFNSW_OPENDATA_KEY` as a GitHub Actions secret too. `.github/workflows/sydney-timetable.yml` runs
@@ -31,6 +36,9 @@ Victoria's, Transport for NSW's and Translink's GTFS Realtime feeds.
    month ahead and its trip ids change with each version.
 5. Brisbane needs no key. `.github/workflows/brisbane-timetable.yml` runs `npm run gtfs:brisbane` every week and
    commits `data/brisbane/`, as Translink publishes a new timetable (with new trip ids) most weeks.
+6. Melbourne's trams use the same key as the trains. `.github/workflows/tram-timetable.yml` runs `npm run gtfs:trams`
+   every week and commits `data/trams/`. Tram stops aren't laid out by hand: the script bends their real positions to
+   fit the train schematic (a thin-plate spline through the train stations), so each route passes the right stations.
 
 ## Development
 

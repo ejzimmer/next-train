@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { BusDto } from "../shared/buses";
 import type { DepartureDto, LineConfig, SchematicStation, VehicleDto } from "../shared/types";
+import { busBetween, type ShownBus } from "./buses";
 import { useNetwork } from "./networks";
 import { networkGeometry, pathOf, pointAlong, type Pt } from "./schematic";
 import { useStopped } from "./useStopped";
@@ -44,8 +46,8 @@ interface Props {
   closedStretches: { line: string; from: string; to: string }[];
   now: number;
   selected: string | null;
-  /** The station nearest the device, when the viewer has asked for it. */
-  nearest: string | null;
+  /** The station nearest the device on each line shown, when the viewer has asked for them. */
+  nearest: string[];
   onSelect: (stationId: string) => void;
   /** The trip whose card is open, shown beside its train instead of a station's board. */
   selectedTrain: string | null;
@@ -56,6 +58,9 @@ interface Props {
   reveal: string | null;
   /** Shown beside the selected station's name, or the selected train. */
   board: ReactNode;
+  /** Buses linking the lines showing, drawn only between those links, and where they are. */
+  buses?: ShownBus[];
+  busVehicles?: BusDto[];
 }
 
 const LABEL: Record<SchematicStation["label"], { dx: number; dy: number; anchor: "start" | "middle" | "end" }> = {
@@ -78,7 +83,12 @@ interface MapStation {
   /** The two ends of the marker; the same point when every line through it is drawn in one place. */
   ends: [Pt, Pt];
   labelAt: Pt;
+  /** A tram stop: drawn small, its name shown only on hover, focus or when chosen. */
+  tram: boolean;
 }
+
+/** How far a tram stop's name sits from its stop. */
+const TRAM_LABEL = 8;
 
 function farthestPair(points: Pt[]): [Pt, Pt] {
   let best: [Pt, Pt] = [points[0], points[0]];
@@ -105,6 +115,8 @@ export function LineMap({
   boarded,
   reveal,
   board,
+  buses = [],
+  busVehicles = [],
 }: Props) {
   const network = useNetwork();
   const { lines: LINES, stations: STATIONS, homeLine } = network;
@@ -126,6 +138,7 @@ export function LineMap({
           colours: new Set<string>(),
           ends: [geo.stations[i], geo.stations[i]] as [Pt, Pt],
           labelAt: geo.stations[i],
+          tram: line.mode === "tram",
         };
         entry.points.push(geo.stations[i]);
         entry.colours.add(line.colour);
@@ -138,7 +151,7 @@ export function LineMap({
       const ys = s.points.map((p) => p[1]);
       const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
       const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-      const l = LABEL[s.label];
+      const l = s.tram ? { dx: TRAM_LABEL, dy: 4 } : LABEL[s.label];
       const edge: Pt =
         s.label === "t"
           ? [cx, Math.min(...ys)]
@@ -152,6 +165,17 @@ export function LineMap({
     return [...byId.values()];
   }, [lines, geometry]);
 
+  // Where each bus links: the middle of the station or tram stop.
+  const placeAt = useMemo(() => {
+    const at = new Map<string, Pt>();
+    for (const s of stations) {
+      const xs = s.points.map((p) => p[0]);
+      const ys = s.points.map((p) => p[1]);
+      at.set(s.id, [(Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2]);
+    }
+    return at;
+  }, [stations]);
+
   // The drawing is cropped to the lines switched on, labels included.
   const box = useMemo(() => {
     let [x0, y0, x1, y1] = [Infinity, Infinity, -Infinity, -Infinity];
@@ -160,6 +184,7 @@ export function LineMap({
     };
     for (const s of stations) {
       s.points.forEach(([x, y]) => add(x, y));
+      if (s.tram) continue;
       const w = s.name.length * CHAR;
       const [x, y] = s.labelAt;
       const anchor = LABEL[s.label].anchor;
@@ -173,6 +198,8 @@ export function LineMap({
 
   // Ctrl/⌘ + wheel (or a trackpad pinch), a two-finger pinch and the + and - keys zoom.
   const [scale, setZoom] = useState(1);
+  // The tram stop being pointed at or focused: its name is the only tram stop name shown, over everything else.
+  const [pointed, setPointed] = useState<string | null>(null);
   const [width, height] = [box.width * scale, box.height * scale];
   // The scale on screen, and the one asked for, which runs ahead of it while several zoom events
   // arrive before the next render.
@@ -269,6 +296,7 @@ export function LineMap({
           for (let t = 0; t <= steps; t++) pts.push([x0 + ((x1 - x0) * t) / steps, y0 + ((y1 - y0) * t) / steps]);
         }
     for (const s of stations) {
+      if (s.tram) continue;
       const [x, y] = s.labelAt;
       const w = s.name.length * CHAR;
       const anchor = LABEL[s.label].anchor;
@@ -416,19 +444,36 @@ export function LineMap({
                 <feFlood className="label-bg" />
                 <feComposite in="SourceGraphic" operator="over" />
               </filter>
+              {/* The same, solid, behind a tram stop's name. */}
+              <filter id="label-solid" x="-0.06" y="-0.15" width="1.12" height="1.3">
+                <feFlood className="label-solid" />
+                <feComposite in="SourceGraphic" operator="over" />
+              </filter>
             </defs>
-            {lines.map((line) => {
+            {/* Buses first, thin, under everything else: each through just the links it makes. */}
+            {buses.map((bus) => {
+              const longest = bus.dirs.reduce((a, b) => (b.links.length > a.links.length ? b : a));
+              const pts = longest.links.map((l) => placeAt.get(l.place)).filter((p): p is Pt => !!p);
+              return (
+                <path key={bus.id} className="bus-route" d={pathOf(pts)} stroke={bus.colour} aria-hidden>
+                  <title>{`${bus.id} ${bus.name}`}</title>
+                </path>
+              );
+            })}
+            {/* Trams first, so the trains are drawn over them. */}
+            {[...lines.filter((l) => l.mode === "tram"), ...lines.filter((l) => l.mode !== "tram")].map((line) => {
               const geo = geometry.get(line.id)!;
               const n = line.stations.length - 1;
               const main = geo.segments.slice(0, n).flat();
+              const tram = line.mode === "tram";
               return (
-                <g key={line.id} stroke={line.colour} strokeWidth={line.mode === "light-rail" ? 6 : 8} fill="none" strokeLinejoin="round">
+                <g key={line.id} stroke={line.colour} strokeWidth={tram ? 3 : line.mode === "light-rail" ? 6 : 8} fill="none" strokeLinejoin="round">
                   {geo.segments.slice(n).map((track, i) => (
                     <path key={i} d={pathOf(track)} strokeLinecap="round" />
                   ))}
                   <path d={pathOf(main)} strokeLinecap="round" />
-                  {!carriesOn(line, line.stations[n].id) && <EndBar points={geo.segments[n - 1]} />}
-                  {startsFromEnd(line) && <EndBar points={[...geo.segments[0]].reverse()} />}
+                  {!carriesOn(line, line.stations[n].id) && <EndBar points={geo.segments[n - 1]} small={tram} />}
+                  {startsFromEnd(line) && <EndBar points={[...geo.segments[0]].reverse()} small={tram} />}
                 </g>
               );
             })}
@@ -443,7 +488,7 @@ export function LineMap({
                 <path key={`${id}-${from}-${to}`} className="bus-stretch" d={pathOf(geo.segments.slice(a, b).flat())} />
               );
             })}
-            {stations.map((s) => {
+            {[...stations.filter((s) => s.tram), ...stations.filter((s) => !s.tram)].map((s) => {
               const interchange = s.colours.size > 1;
               const [p, q] = s.ends;
               const [cx, cy] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
@@ -452,14 +497,20 @@ export function LineMap({
               return (
                 <g
                   key={s.id}
-                  className={`station${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest === s.id ? " nearest" : ""}`}
+                  className={`station${s.tram ? " tram" : ""}${interchange ? " interchange" : ""}${selected === s.id ? " selected" : ""}${nearest.includes(s.id) ? " nearest" : ""}`}
                   onClick={() => onSelect(s.id)}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelect(s.id)}
                   role="button"
                   tabIndex={0}
-                  aria-label={nearest === s.id ? `${s.name}, nearest to you` : s.name}
+                  aria-label={nearest.includes(s.id) ? `${s.name}, nearest to you` : s.name}
                   aria-pressed={selected === s.id}
                   style={{ ["--line" as string]: colour }}
+                  {...(s.tram && {
+                    onMouseEnter: () => setPointed(s.id),
+                    onMouseLeave: () => setPointed((p) => (p === s.id ? null : p)),
+                    onFocus: () => setPointed(s.id),
+                    onBlur: () => setPointed((p) => (p === s.id ? null : p)),
+                  })}
                 >
                   <line
                     className="station-hit"
@@ -467,10 +518,10 @@ export function LineMap({
                     y1={p[1]}
                     x2={q[0]}
                     y2={q[1]}
-                    strokeWidth={28}
+                    strokeWidth={s.tram ? 10 : 28}
                     strokeLinecap="round"
                   />
-                  {nearest === s.id && <circle className="station-here" cx={cx} cy={cy} r={12 + half} />}
+                  {nearest.includes(s.id) && <circle className="station-here" cx={cx} cy={cy} r={(s.tram ? 6 : 12) + half} />}
                   {/* A dot in the line's colour, or a white capsule outlined in black across every line at an interchange. */}
                   <line
                     className="station-rim"
@@ -479,7 +530,7 @@ export function LineMap({
                     x2={q[0]}
                     y2={q[1]}
                     stroke={colour}
-                    strokeWidth={15}
+                    strokeWidth={s.tram ? 6 : 15}
                     strokeLinecap="round"
                   />
                   <line
@@ -488,13 +539,45 @@ export function LineMap({
                     y1={p[1]}
                     x2={q[0]}
                     y2={q[1]}
-                    strokeWidth={9}
+                    strokeWidth={s.tram ? 3 : 9}
                     strokeLinecap="round"
                   />
-                  <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
+                  {!s.tram && (
+                    <text x={s.labelAt[0]} y={s.labelAt[1]} textAnchor={LABEL[s.label].anchor}>
+                      {s.name}
+                    </text>
+                  )}
+                </g>
+              );
+            })}
+            {/* One tram stop's name: the one pointed at, else the chosen one. Drawn last, so nothing covers it. */}
+            {(() => {
+              const s = stations.find((x) => x.tram && x.id === (pointed ?? selected));
+              return (
+                s && (
+                  <text className="tram-label" x={s.labelAt[0]} y={s.labelAt[1]} filter="url(#label-solid)" aria-hidden>
                     {s.name}
                   </text>
-                </g>
+                )
+              );
+            })()}
+            {busVehicles.map((b) => {
+              const route = buses.find((r) => r.id === b.route);
+              const at = route && busBetween(b, route);
+              const [p, q] = at ? [placeAt.get(at.from), placeAt.get(at.to)] : [];
+              if (!route || !at || !p || !q) return null;
+              const dest = route.dirs.find((d) => d.dir === b.dir)?.dest;
+              return (
+                <circle
+                  key={b.id}
+                  className={`bus${now - b.timestamp > STALE_AFTER ? " stale" : ""}`}
+                  cx={p[0] + (q[0] - p[0]) * at.f}
+                  cy={p[1] + (q[1] - p[1]) * at.f}
+                  r={3.5}
+                  style={{ ["--line" as string]: route.colour }}
+                >
+                  <title>{`${route.id}${dest ? ` to ${dest}` : ""}`}</title>
+                </circle>
               );
             })}
             {vehicles.map((v) => {
@@ -504,11 +587,12 @@ export function LineMap({
               const angle = p.angle + (v.direction === "citybound" ? 180 : 0);
               const dest = destinationOf(v);
               const select = () => onSelectTrain(v.tripId);
+              const tram = network.lineById[v.line]?.mode === "tram";
               return (
                 <g
                   key={v.id}
-                  className={`train${!homeLine || v.line === homeLine ? "" : " shared"}${age > STALE_AFTER ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
-                  style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)` }}
+                  className={`train${tram ? " tram" : ""}${!homeLine || v.line === homeLine ? "" : " shared"}${age > STALE_AFTER || v.scheduled ? " stale" : stopped.has(v.id) ? " stopped" : ""}${selectedTrain === v.tripId ? " selected" : ""}`}
+                  style={{ transform: `translate(${p.x}px, ${p.y}px) rotate(${angle}deg)${tram ? " scale(0.55)" : ""}` }}
                   onClick={select}
                   onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && select()}
                   role="button"
@@ -537,8 +621,10 @@ export function LineMap({
             <Legend
               homeName={homeLine && LINES.find((l) => l.id === homeLine)!.name}
               home={!homeLine || lines.some((l) => l.id === homeLine)}
-              others={!!homeLine && lines.some((l) => l.id !== homeLine)}
+              others={!!homeLine && lines.some((l) => l.id !== homeLine && l.mode !== "tram")}
               closed={closedStretches.length > 0}
+              trains={lines.some((l) => l.mode !== "tram")}
+              trams={lines.some((l) => l.mode === "tram")}
               colour={lines[0].colour}
             />
           )}
@@ -554,12 +640,13 @@ export function LineMap({
 }
 
 /** A bar across the end of the line. */
-function EndBar({ points }: { points: Pt[] }) {
+function EndBar({ points, small }: { points: Pt[]; small?: boolean }) {
   const [x0, y0] = points[points.length - 2];
   const [x1, y1] = points[points.length - 1];
   const len = Math.hypot(x1 - x0, y1 - y0) || 1;
-  const [nx, ny] = [(-(y1 - y0) / len) * 10, ((x1 - x0) / len) * 10];
-  return <line x1={x1 - nx} y1={y1 - ny} x2={x1 + nx} y2={y1 + ny} strokeWidth={6} />;
+  const half = small ? 4 : 10;
+  const [nx, ny] = [(-(y1 - y0) / len) * half, ((x1 - x0) / len) * half];
+  return <line x1={x1 - nx} y1={y1 - ny} x2={x1 + nx} y2={y1 + ny} strokeWidth={small ? 2.5 : 6} />;
 }
 
 /**
@@ -616,20 +703,25 @@ function Legend({
   others,
   closed,
   colour,
+  trains,
+  trams,
 }: {
   homeName: string | null;
   home: boolean;
   others: boolean;
   closed: boolean;
   colour: string;
+  trains: boolean;
+  trams: boolean;
 }) {
   const items: [string, string][] = [
-    ...(home && others
+    ...(!trains ? [] : home && others
       ? ([
           ["train", `${homeName} train`],
           ["train shared", "Other trains"],
         ] as [string, string][])
       : [[home ? "train" : "train shared", "Train"] as [string, string]]),
+    ...(trams ? [["train shared tram", "Tram"] as [string, string]] : []),
     ["train stopped", "Stopped"],
     ["train stale", "No recent update"],
   ];
@@ -638,7 +730,7 @@ function Legend({
       {items.map(([cls, label]) => (
         <li key={label}>
           <svg width={28} height={24} viewBox="-14 -12 28 24" aria-hidden>
-            <path className={cls} d={ARROW} />
+            <path className={cls} d={ARROW} transform={cls.includes("tram") ? "scale(0.55)" : undefined} />
           </svg>
           {label}
         </li>

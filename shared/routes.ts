@@ -5,6 +5,19 @@ export function isLineRoute(routeId: string | null | undefined, line: LineConfig
   return !!routeId && (line.routeIdMatch.some((m) => routeId.includes(m)) || routePattern(line)?.test(routeId) === true);
 }
 
+/**
+ * Whether a realtime trip is on the line: by its route, or for a tram whose feed leaves the route out, by the
+ * timetable knowing the trip.
+ */
+export function isLineTrip(
+  trip: { routeId?: string | null; tripId?: string | null } | null | undefined,
+  line: LineConfig,
+  data: { trips: Record<string, unknown> },
+): boolean {
+  if (isLineRoute(trip?.routeId, line)) return true;
+  return line.mode === "tram" && !trip?.routeId && !!trip?.tripId && trip.tripId in data.trips;
+}
+
 const patterns = new WeakMap<LineConfig, RegExp>();
 function routePattern(line: LineConfig) {
   if (!line.routeIdPattern) return null;
