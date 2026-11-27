@@ -20,33 +20,54 @@ export function csv(files: Files, name: string): Row[] {
   return parse(strFromU8(file), { columns: true, skip_empty_lines: true, bom: true });
 }
 
+/** How many bytes of a file are decoded to text at once. */
+const CHUNK_BYTES = 16 * 1024 * 1024;
+
+export type StopTimeRow = (tripId: string, stopId: string, seq: number, time: number | null) => void;
+
 /**
  * Calls `row` with each stop_times.txt row's trip id, stop id, stop sequence and time (departure, else
- * arrival, in seconds after midnight; null when neither is given). The file is large, so it's gone through
- * a line at a time instead of parsed all at once.
+ * arrival, in seconds after midnight; null when neither is given).
  */
-export function eachStopTime(files: Files, row: (tripId: string, stopId: string, seq: number, time: number | null) => void) {
-  const text = strFromU8(files["stop_times.txt"]);
-  let at = text.indexOf("\n") + 1;
-  const header = text
-    .slice(0, at)
-    .replace(/^﻿/, "")
-    .trim()
-    .split(",")
-    .map((c) => c.replace(/"/g, ""));
-  const [ti, si, qi, ai, di] = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((c) =>
-    header.indexOf(c),
-  );
-  const unquote = (v: string | undefined) => v?.replace(/"/g, "");
+export function eachStopTime(files: Files, row: StopTimeRow) {
+  createStopTimeReader(row)(files["stop_times.txt"], true);
+}
+
+/** Like eachStopTime, for stop_times.txt's bytes in as many pieces as they come (see createLineReader). */
+export function createStopTimeReader(row: StopTimeRow) {
   const seconds = (hms: string) => hms.split(":").reduce((t, part) => t * 60 + Number(part), 0);
-  while (at < text.length) {
-    let next = text.indexOf("\n", at);
-    if (next < 0) next = text.length;
-    const cols = text.slice(at, next).replace(/\r$/, "").split(",");
-    at = next + 1;
-    const tripId = unquote(cols[ti]);
-    if (!tripId) continue;
-    const time = unquote(cols[di]) || unquote(cols[ai]);
-    row(tripId, unquote(cols[si])!.trim(), Number(unquote(cols[qi])), time ? seconds(time.trim()) : null);
-  }
+  const unquote = (v: string | undefined) => (v ?? "").replace(/"/g, "").trim();
+  let columns: number[] | null = null;
+  const readLine = (line: string) => {
+    const cells = line.replace(/\r$/, "").split(",");
+    if (!columns) {
+      const header = cells.map((c) => unquote(c).replace(/^\uFEFF/, ""));
+      columns = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((c) => header.indexOf(c));
+      return;
+    }
+    const [ti, si, qi, ai, di] = columns;
+    const tripId = unquote(cells[ti]);
+    if (!tripId) return;
+    const time = unquote(cells[di]) || unquote(cells[ai]);
+    row(tripId, unquote(cells[si]), Number(unquote(cells[qi])), time ? seconds(time) : null);
+  };
+  return createLineReader(readLine);
+}
+
+/**
+ * Returns a function that takes a text file's bytes, in as many pieces as they come, and calls `onLine` with
+ * each non-empty line. The text is decoded a slice at a time, because a whole GTFS file can be longer than a
+ * string is allowed to be.
+ */
+export function createLineReader(onLine: (line: string) => void) {
+  const decoder = new TextDecoder();
+  let partLine = "";
+  return (bytes: Uint8Array, final: boolean) => {
+    for (let start = 0; start < bytes.length || (final && start === 0); start += CHUNK_BYTES) {
+      const last = final && start + CHUNK_BYTES >= bytes.length;
+      const lines = (partLine + decoder.decode(bytes.subarray(start, start + CHUNK_BYTES), { stream: !last })).split("\n");
+      partLine = last ? "" : lines.pop()!;
+      for (const line of lines) if (line) onLine(line);
+    }
+  };
 }

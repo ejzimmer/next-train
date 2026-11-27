@@ -5,6 +5,7 @@ import { melbourneTramType } from "../shared/trainType";
 import { TRAM_LINES } from "../shared/trams";
 import { NETWORKS } from "../src/networks";
 import { networkGeometry, TRAM_SPACING } from "../src/schematic";
+import { TIMETABLED_WEDNESDAY } from "./tramTimetableDay";
 
 const route = (n: string) => TRAM_LINES.find((l) => l.id === `tram-${n}`)!;
 
@@ -69,8 +70,7 @@ describe("timetabled trams", () => {
     const { scheduledTrams, scheduledTrip } = await import("../shared/scheduledTrams");
     const { tramData } = await import("../shared/lines");
     const { config, data } = cities.melbourne["tram-96"];
-    // 9am on a weekday the timetable covers.
-    const now = Date.parse("2026-11-11T22:00:00Z") / 1000;
+    const now = TIMETABLED_WEDNESDAY.morning;
     const trams = scheduledTrams(config, data, tramData, now);
     expect(trams.length).toBeGreaterThan(10);
     for (const t of trams) {

@@ -4,17 +4,17 @@ import { cities, tramData } from "../shared/lines";
 import { liveTrams, matchDepartures, resetRouteIds, signedUrl, timingStops, type DeparturesResponse } from "../shared/ptvTimetable";
 import { serviceMidnight } from "../shared/schedule";
 import { scheduledTrams, scheduledTrip } from "../shared/scheduledTrams";
+import { TIMETABLED_WEDNESDAY } from "./tramTimetableDay";
 
 const creds = { devid: "1234567", key: "abcd-ef" };
-// 9am on a weekday the timetable covers.
-const now = Date.parse("2026-11-11T22:00:00Z") / 1000;
+const now = TIMETABLED_WEDNESDAY.morning;
 const { config, data } = cities.melbourne["tram-96"];
 
 /** A departure for a trip the timetable has running now, at the first stop asked about that's ahead of it. */
 function departureAhead(late: number) {
   const tram = scheduledTrams(config, data, tramData, now).find((t) => t.direction === "outbound")!;
   const [p, start] = tramData.routes["96"].trips[tram.tripId];
-  const midnight = serviceMidnight("20261112")!;
+  const midnight = serviceMidnight(TIMETABLED_WEDNESDAY.serviceDate)!;
   const asked = new Set(timingStops(config, data));
   const [, stop, offset] = tramData.routes["96"].patterns[p].stops.find(([, s, o]) => asked.has(s) && midnight + start + o > now)!;
   const at = (s: number) => new Date(s * 1000).toISOString().replace(/\.000/, "");
