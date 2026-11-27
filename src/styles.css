@@ -4,6 +4,7 @@
   --muted: #666666;
   --panel: #f4f4f4;
   --highlight: #e3e6ea;
+  --here: #0072ce;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--fg);
   background: var(--bg);
@@ -15,6 +16,7 @@
     --muted: #a0a0a0;
     --panel: #1f1f1f;
     --highlight: #3a3f46;
+    --here: #4da3ff;
   }
 }
 body { margin: 0; background: var(--bg); }
@@ -78,8 +80,8 @@ main { position: relative; }
 .tram-label { fill: var(--fg); font-size: 12px; font-weight: 600; pointer-events: none; }
 .label-solid { flood-color: var(--highlight); }
 /* "You are here": a blue ring around the nearest station on each line, filled in on the closest of them. */
-.station-here { fill: none; stroke: #0072ce; stroke-width: 1.5; stroke-opacity: 0.6; }
-.station-here.closest { fill: rgba(0, 114, 206, 0.18); stroke-width: 2.5; stroke-opacity: 1; }
+.station-here { fill: none; stroke: var(--here); stroke-width: 1.5; }
+.station-here.closest { fill: color-mix(in srgb, var(--here) 22%, transparent); stroke-width: 3; }
 .train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
 .train.stopped { fill: #0072ce; stroke: #ffd400; }
 .train.stale { fill: #c9c9c9; stroke: #7a8a99; }
