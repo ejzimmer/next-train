@@ -18,7 +18,7 @@ import stations from "../data/stations.json";
 import tramNetwork from "../data/trams/network.json";
 import { STATIONS } from "../shared/network";
 import type { BusNetworkData, BusRoutesData } from "../shared/buses";
-import { csv, load, type Files } from "./gtfs";
+import { createStopTimeReader, csv, load, type Files, type StopTimeRow } from "./gtfs";
 
 const DEFAULT_SOURCE = "https://data.ptv.vic.gov.au/downloads/gtfs.zip";
 const METRO_BUS = "4";
@@ -66,34 +66,14 @@ function nearby(lat: number, lon: number): { id: string; m: number }[] {
   return out;
 }
 
-/** stop_times.txt is too big to hold as one string; this goes through it a chunk at a time. */
-function eachStopTime(zip: Uint8Array, row: (tripId: string, stopId: string, seq: number, time: number | null) => void) {
-  let rest = "";
-  let header: string[] | null = null;
-  let cols: number[] = [];
-  const decoder = new TextDecoder();
-  const seconds = (hms: string) => hms.split(":").reduce((t, part) => t * 60 + Number(part), 0);
-  const unquote = (v: string | undefined) => (v ?? "").replace(/"/g, "").trim();
-  const line = (l: string) => {
-    const c = l.replace(/\r$/, "").split(",");
-    if (!header) {
-      header = c.map((h) => unquote(h).replace(/^﻿/, ""));
-      cols = ["trip_id", "stop_id", "stop_sequence", "arrival_time", "departure_time"].map((n) => header!.indexOf(n));
-      return;
-    }
-    const tripId = unquote(c[cols[0]]);
-    if (!tripId) return;
-    const time = unquote(c[cols[4]]) || unquote(c[cols[3]]);
-    row(tripId, unquote(c[cols[1]]), Number(unquote(c[cols[2]])), time ? seconds(time) : null);
-  };
+/** stop_times.txt is too big to unzip whole; this goes through it a chunk at a time. */
+function eachStopTime(zip: Uint8Array, row: StopTimeRow) {
   const unzip = new Unzip((file) => {
     if (file.name !== "stop_times.txt") return;
+    const readStopTimes = createStopTimeReader(row);
     file.ondata = (err, chunk, final) => {
       if (err) throw err;
-      const text = rest + decoder.decode(chunk, { stream: !final });
-      const lines = text.split("\n");
-      rest = final ? "" : lines.pop()!;
-      for (const l of lines) if (l) line(l);
+      readStopTimes(chunk, final);
     };
     file.start();
   });

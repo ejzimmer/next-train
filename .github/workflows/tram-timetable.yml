@@ -1,11 +1,11 @@
-# PTV's tram timetable gets new trip ids when it changes, so Melbourne's tram data (and its bus routes, which
-# change too) is rebuilt every week and committed, which redeploys the site. The
-# GTFS download needs no key.
+# PTV's tram timetable gets new trip ids when it changes, and live trams whose trip isn't in our data have no
+# direction or destination, so Melbourne's tram data (and its bus routes, which change too) is rebuilt every day
+# and committed, which redeploys the site. The GTFS download needs no key.
 name: Tram and bus timetable
 
 on:
   schedule:
-    - cron: "0 17 * * 0" # Monday 4am in Melbourne (3am in winter)
+    - cron: "0 17 * * *" # 4am in Melbourne (3am in winter)
   workflow_dispatch:
 
 permissions:
@@ -23,7 +23,6 @@ jobs:
       - run: npm ci
       - run: npm run gtfs:trams
         env:
-          # stop_times.txt for trams is about 400 MB.
           NODE_OPTIONS: --max-old-space-size=6144
       - run: npm run gtfs:buses
         env:
