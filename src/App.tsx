@@ -335,6 +335,7 @@ function CityMap({ network, onCity }: { network: Network; onCity: (city: City) =
             now={now}
             selected={station}
             nearest={nearestIds}
+            closest={nearestId}
             onSelect={select}
             selectedTrain={cardVehicle ? selectedTrain : null}
             onSelectTrain={selectTrain}
