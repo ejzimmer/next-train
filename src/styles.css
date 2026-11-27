@@ -77,8 +77,9 @@ main { position: relative; }
 /* Tram stops are small, and named only when pointed at or chosen. */
 .tram-label { fill: var(--fg); font-size: 12px; font-weight: 600; pointer-events: none; }
 .label-solid { flood-color: var(--highlight); }
-/* "You are here": a blue ring around the nearest station. */
-.station-here { fill: rgba(0, 114, 206, 0.18); stroke: #0072ce; stroke-width: 2; }
+/* "You are here": a blue ring around the nearest station on each line, filled in on the closest of them. */
+.station-here { fill: none; stroke: #0072ce; stroke-width: 1.5; stroke-opacity: 0.6; }
+.station-here.closest { fill: rgba(0, 114, 206, 0.18); stroke-width: 2.5; stroke-opacity: 1; }
 .train { fill: #ffd400; stroke: #0072ce; stroke-width: 2.5; stroke-linejoin: round; transition: transform 2s ease-in-out; }
 .train.stopped { fill: #0072ce; stroke: #ffd400; }
 .train.stale { fill: #c9c9c9; stroke: #7a8a99; }
